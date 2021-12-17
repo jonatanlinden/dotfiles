@@ -560,6 +560,7 @@
   ;; always delete and copy recursively
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
+  (dired-create-destination-dirs t)
   (dired-dwim-target t))
 
   ;; enable some really cool extensions like C-x C-j(dired-jump)
