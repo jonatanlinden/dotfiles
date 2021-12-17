@@ -4,3 +4,6 @@ README.md
 .zshenv
 .zprofile
 {{- end }}
+{{- if ne .chezmoi.os "windows" }}
+Profile.ps1
+{{- end }}
