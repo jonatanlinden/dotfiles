@@ -128,8 +128,7 @@ function cropopen; {
     pdfcrop --resolution 72 "$1" && open "${1:t:r}-crop.pdf"
 }
 
-
-alias cat=ccat
+alias cat=bat
 
 # Enable ls colors
 export LSCOLORS="Gxfxcxdxbxegedabagacad"
@@ -149,6 +148,6 @@ rbenv() {
   rbenv "$@"
 }
 
-# zprof
+[[ ! -r $HOME/.opam/opam-init/init.zsh ]] || source $HOME/.opam/opam-init/init.zsh  > /dev/null 2> /dev/null
 
-# export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+# zprof
