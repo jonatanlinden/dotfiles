@@ -780,6 +780,7 @@
   )
 
 (use-package inf-ruby
+  :after ruby-mode
   :straight t
   :config
   ; (add-to-list 'inf-ruby-implementations '("ruby" . "irb --prompt default --noreadline -r irb/completion"))
@@ -788,6 +789,7 @@
 
 (use-package ruby-mode
   :straight t
+  :mode ("Rakefile" "\\.rb\\'")
   :custom (ruby-align-chained-calls t)
   :config
   (use-package smartparens-ruby)
@@ -1387,6 +1389,8 @@
   :hook (prog-mode . (lambda () (add-to-list'xref-backend-functions #'dumb-jump-xref-activate)))
   )
 
+
+
 (use-package bm
   :disabled
   :straight t
@@ -1463,6 +1467,9 @@
   :bind (("C-c C-/" . point-history-show))
   :init (setq point-history-ignore-buffer "^ \\*Minibuf\\|^ \\*point-history-show*"))
 
+(use-package jl-ocaml
+  :load-path "lisp"
+  )
 
 (cheatsheet-add
  :group 'General

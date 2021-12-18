@@ -1,2 +1,2 @@
-
 export PATH=${HOME}/.rbenv/shims:${PATH}:${HOME}/local/bin
+eval $(/usr/local/bin/brew shellenv)
