@@ -1,4 +1,5 @@
 
+{{ if (eq .chezmoi.os "darwin") }}
 font:
   size: 14.0
   normal:
@@ -12,6 +13,21 @@ font:
   italic:
     family: SF Mono
     style: Italic
+{{ else }}
+font:
+  size: 11.0
+  normal:
+    family: Cascadia PL
+    style: Regular
+
+  bold:
+    family: Cascadia PL
+    style: Bold
+
+  italic:
+    family: Cascadia PL
+    style: Italic
+{{ end }}
 
 
 # Colors (Base16 Default Dark)
