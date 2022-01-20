@@ -1,0 +1,11 @@
+shell:
+  program: "c:/Program Files/Git/bin/bash.exe"
+  args:
+    - --login
+
+working_directory: "d:/work"
+
+window:
+  dimensions:
+    columns: 110
+    lines: 55
