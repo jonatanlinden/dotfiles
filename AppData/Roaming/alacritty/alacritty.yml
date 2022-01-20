@@ -62,3 +62,4 @@ colors:
 key_bindings:
   # remove the line below!
   - { key: W, mods: Command, action: Quit }
+  - { key: Space, mods: Control, chars: "\x00" }
