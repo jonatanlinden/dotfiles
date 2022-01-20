@@ -24,7 +24,8 @@
   :custom
   (merlin-completion-with-doc t)
   ;; Use opam switch to lookup ocamlmerlin binary
-  (merlin-command 'opam)
+  (merlin-command "ocamlmerlin")
+  ;;(merlin-command "opam exec ocamlmerlin")
   :hook ((tuareg-mode . merlin-mode)
   (tuareg-mode . jl/ocaml-mode-hook)
   (tuareg-mode . company-mode)))
