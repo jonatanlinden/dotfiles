@@ -3,25 +3,23 @@ shell:
   args:
     - "-d Ubuntu-18.04"
 
-working_directory: "~"
-
 window:
   dimensions:
     columns: 110
     lines: 55
 
 font:
-  size: 14.0
+  size: 11.0
   normal:
-    family: Cascadia PL
+    family: Cascadia Code PL
     style: Regular
 
   bold:
-    family: Cascadia PL
+    family: Cascadia Code PL
     style: Bold
 
   italic:
-    family: Cascadia PL
+    family: Cascadia Code PL
     style: Italic
 
 # Colors (Base16 Default Dark)
