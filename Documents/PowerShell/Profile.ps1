@@ -11,7 +11,7 @@ Set-PSReadLineKeyHandler -Key Tab -Function Complete
 
 $Env:EDITOR="emacsclient"
 
-function reload_alias { & $PROFILE }
+function reload_alias { & $PROFILE.CurrentUserAllHosts }
 Set-Alias -Name reload -Value reload_alias
 
 Invoke-Expression (&starship init powershell)
