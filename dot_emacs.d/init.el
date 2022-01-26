@@ -290,6 +290,7 @@
   (exec-path-from-shell-initialize))
 
 (use-package solarized-theme
+  :if window-system
   :straight t
   :custom
   (solarized-scale-org-headlines nil)
@@ -305,13 +306,10 @@
   )
 
 (use-package color-theme-sanityinc-tomorrow
+  :unless window-system
   :straight t
-  :disabled t
-  :init
-  (if window-system
-      (load-theme 'sanityinc-tomorrow-day)
-    (load-theme 'sanityinc-tomorrow-night)
-    ))
+  :init (load-theme 'sanityinc-tomorrow-night)
+  )
 
 (use-package doom-modeline
   :straight t
@@ -875,17 +873,17 @@
   :straight t
   :bind (("C-c g n" . diff-hl-next-hunk)
          ("C-c g p" . diff-hl-previous-hunk))
+  :config (unless (display-graphic-p) (diff-hl-margin-mode))
   ;; Highlight changes to the current file in the fringe
   ;; Highlight changed files in the fringe of Dired
   :hook ((after-init . global-diff-hl-mode)
          (dired-mode . diff-hl-dired-mode)
          (magit-pre-refresh . diff-hl-magit-pre-refresh)
-         (magit-post-refresh . diff-hl-magit-post-refresh))
-  )
+         (magit-post-refresh . diff-hl-magit-post-refresh)))
 
 (use-package hl-todo
   :straight t
-  )
+  :hook ((after-init . global-hl-todo-mode)))
 
 (use-package whitespace
   :commands (whitespace-mode)

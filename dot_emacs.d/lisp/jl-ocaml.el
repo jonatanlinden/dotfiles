@@ -23,6 +23,8 @@
   :straight t
   :custom
   (merlin-completion-with-doc t)
+  ;; Disable Merlin's own error checking
+  (merlin-error-after-save nil)
   ;; Use opam switch to lookup ocamlmerlin binary
   (merlin-command "ocamlmerlin")
   ;;(merlin-command "opam exec ocamlmerlin")
@@ -32,8 +34,6 @@
 
 
 (defun ocaml-init-flycheck ()
-  ;; Disable Merlin's own error checking
-  (setq merlin-error-after-save nil)
   ;; Enable Flycheck checker
   (flycheck-ocaml-setup))
 

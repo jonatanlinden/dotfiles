@@ -1,3 +1,18 @@
 HISTCONTROL=ignoredups:erasedups
 shopt -s histappend
 PROMPT_COMMAND="history -n; history -w; history -c; history -r; $PROMPT_COMMAND"
+
+EDITOR=emacs
+if command -v "emacs27" &> /dev/null
+then
+    EDITOR=emacs27
+fi
+export EDITOR
+
+if command -v "exa" &> /dev/null
+then
+    alias ls=exa
+fi
+
+
+eval "$(starship init bash)"
