@@ -14,5 +14,5 @@ then
     alias ls=exa
 fi
 
-
+eval "$(rbenv init -)"
 eval "$(starship init bash)"
