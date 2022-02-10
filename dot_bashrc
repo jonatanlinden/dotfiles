@@ -14,5 +14,6 @@ then
     alias ls=exa
 fi
 
+eval $(keychain --eval id_ed25519)
 eval "$(rbenv init -)"
 eval "$(starship init bash)"
