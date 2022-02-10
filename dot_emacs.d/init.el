@@ -9,6 +9,11 @@
 ;;            (sort (font-family-list) #'string-lessp) "\n"))
 
 ;; disable temporarily
+
+;; do not initialize package.el. Keep comment here to prevent package.el
+;; re-inserting the call
+;; (package-initialize)
+
 (defvar jl/file-name-handler-alist file-name-handler-alist)
 (setq file-name-handler-alist nil)
 ;; restore it after initialization
