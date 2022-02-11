@@ -6,5 +6,4 @@ README.md
 {{- end }}
 {{- if ne .chezmoi.os "windows" }}
 Profile.ps1
-AppData
 {{- end }}
