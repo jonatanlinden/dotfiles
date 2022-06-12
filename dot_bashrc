@@ -14,6 +14,11 @@ then
     alias ls=exa
 fi
 
+if [ -d "$HOME/.rbenv/bin" ] ; then
+    PATH="$HOME/.rbenv/bin:$PATH"
+fi
+
+
 eval $(keychain --eval id_ed25519)
 eval "$(rbenv init -)"
 eval "$(starship init bash)"
