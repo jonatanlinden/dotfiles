@@ -2,18 +2,17 @@
 
 ;; For inspiration: https://emacs.nasy.moe/
 ;; https://ladicle.com/post/config
-;; (setq esup-child-profile-require-level 0)
+(setq esup-child-profile-require-level 0)
 ;; List available fonts in *Messages* buffer
 ;;(message
 ;; (mapconcat (quote identity)
 ;;            (sort (font-family-list) #'string-lessp) "\n"))
 
+(defvar *is-mac* (eq system-type 'darwin))
+(defvar *is-win* (eq system-type 'windows-nt))
+
+
 ;; disable temporarily
-
-;; do not initialize package.el. Keep comment here to prevent package.el
-;; re-inserting the call
-;; (package-initialize)
-
 (defvar jl/file-name-handler-alist file-name-handler-alist)
 (setq file-name-handler-alist nil)
 ;; restore it after initialization
@@ -140,7 +139,7 @@
 (size-indication-mode t)
 
 ;; enable y/n answers
-(fset 'yes-or-no-p 'y-or-n-p)
+(setq-default use-short-answers t)
 
 ;; show trailing whitespace in editor
 ;;(setq-default show-trailing-whitespace t)
@@ -235,9 +234,6 @@
 (bind-key "M-l" 'downcase-dwim)
 (bind-key "M-u" 'upcase-dwim)
 
-
-;(straight-use-package 'no-littering)
-                                        ;(require 'no-littering)
 (use-package no-littering
   :straight t
   :init
@@ -245,7 +241,7 @@
         `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
         custom-file (no-littering-expand-etc-file-name "custom.el")))
 
-(load custom-file)
+(load custom-file t)
 
 ;; load the personal settings
 (when (file-exists-p jonatan-personal-dir)
@@ -330,7 +326,7 @@
   (setq-default header-line-format '(which-func-mode ("" which-func-format " ")))
   (setq mode-line-misc-info
         (assq-delete-all 'which-function-mode mode-line-misc-info))
-  (which-function-mode))
+  :hook (prog-mode . which-function-mode))
 
 (use-package paren
   :hook (after-init . show-paren-mode)
@@ -536,9 +532,6 @@
    ("C-w" . counsel-up-directory)))
 
 
-(use-package wgrep
-  :straight t)
-
 (use-package ivy-prescient
   :after counsel
   :straight t
@@ -552,24 +545,14 @@
   (after-init . volatile-highlights-mode)
   )
 
-
-;; (use-package fd-dired
-;;   :straight (fd-dired :type git :host github :repo "yqrashawn/fd-dired")
-;;   :commands fd-dired
-;; )
-
 (use-package dired
+  :commands dired-mode
   :custom
   ;; always delete and copy recursively
   (dired-recursive-deletes 'always)
   (dired-recursive-copies 'always)
   (dired-create-destination-dirs t)
   (dired-dwim-target t))
-
-  ;; enable some really cool extensions like C-x C-j(dired-jump)
-(use-package dired-x
-  :after dired
-  :bind ("C-x C-j" . dired-jump))
 
 (use-package dired-plus
   :straight t
@@ -579,12 +562,6 @@
         ([remap yank] . diredp-yank-files)))
 
 (put 'dired-find-alternate-file 'disabled nil)
-
-(use-package company-flx
-  :disabled t
-  :after (company flx)
-  :straight t
-  :init (company-flx-mode +1))
 
 (use-package company
   :straight t
@@ -762,11 +739,6 @@
   :config
   (lsp-ui-sideline-mode)
   )
-
-(use-package lsp-treemacs
-  :disabled t
-  :straight t
-  :after lsp-mode)
 
 (use-package flycheck-clang-tidy
   :straight t
@@ -1001,12 +973,6 @@
   :after c++-mode
   :straight t)
 
-(use-package spell-fu
-  :disabled t
-  :straight t
-  :init (setq ispell-dictionary "en_US")
-  :hook (prog-mode . spell-fu-mode))
-
 (use-package general
   :straight t
 )
@@ -1108,8 +1074,6 @@
   :commands wgrep-mode
   :init (add-hook 'ivy-occur-grep-mode-hook
 	                (lambda () (toggle-truncate-lines 1)))
-  ;:init (add-hook 'ivy-occur-grep-mode-hook (lambda ()
-  ;(key-chord-define wgrep-mode-map "dd" 'wgrep-mark-deletion)))
   )
 
 (use-package ws-butler
@@ -1207,14 +1171,6 @@
   (setq org-todo-keywords '((sequence "OPEN" "IN PROGRESS" "|" "CLOSED")))
   ;; :hook (org-mode . visual-line-mode) Doesn't play nice with ejira
   )
-
-;; (use-package mixed-pitch
-;;   :straight t
-;;   :config
-;;   (add-to-list 'mixed-pitch-fixed-pitch-faces 'org-todo)
-;;   (set-face-font 'variable-pitch "Helvetica Neue-15")
-;;   :hook
-;;   (org-mode . mixed-pitch-mode))
 
 (use-package org-mru-clock
   :straight t
@@ -1337,14 +1293,9 @@
 (use-package esup
   :straight t
   :init
-  (setq esup-depth 1)
-  ;(setq esup-child-profile-require-level 0)
+  (setq esup-depth 0)
   :commands esup
   )
-
-(use-package ivy-hydra
-  :straight t
-  :after (ivy hydra))
 
 (when (eq window-system 'w32)
   (setq tramp-default-method "plink")
@@ -1366,62 +1317,24 @@
   (ediff-diff-options "-w")
   (ediff-ignore-similar-regions t)
   (ediff-window-setup-function 'ediff-setup-windows-plain)
-  :bind (:map ediff-mode-map ("C-w" . backward-kill-word))
   :hook
   (ediff-before-setup . store-pre-ediff-winconfig)
   (ediff-quit . restore-pre-ediff-winconfig)
   )
 
-(use-package google-this
-  :straight t
-  :diminish ""
-  :commands (google-this)
-  :config (google-this-mode 1))
-
 (use-package dumb-jump
   :straight t
-  :init
   :custom
   (dumb-jump-selector 'ivy)
   :config
+  (add-to-list 'dumb-jump-language-file-exts '(:language "c++" :ext "tg" :agtype "cc" :rgtype "c"))
   ;;(require 'xref)
   ;;(setq xref-backend-functions (remq 'etags--xref-backend xref-backend-functions))
-  (add-to-list 'dumb-jump-language-file-exts '(:language "c++" :ext "tg" :agtype "cc" :rgtype "c"))
   ;;(add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
   ;; (add-to-list'xref-backend-functions #'dumb-jump-xref-activate)
   :hook (prog-mode . (lambda () (add-to-list'xref-backend-functions #'dumb-jump-xref-activate)))
+  :hook (prog-mode . dumb-jump-mode)
   )
-
-
-
-(use-package bm
-  :disabled
-  :straight t
-  :custom (bm-restore-repository-on-load t)
-  (bm-highlight-style 'bm-highlight-only-fringe)
-  :init
-  ;; restore on load (even before you require bm)
-  :hook ((after-init . bm-repository-load)
-         (kill-buffer . bm-buffer-save)
-         (after-save . bm-buffer-save)
-         (vc-before-checkin . bm-buffer-save)
-         (find-file . bm-buffer-restore)
-         (after-revert . bm-buffer-restore)
-         (kill-emacs . (lambda ()
-                         (bm-buffer-save-all)
-                         (bm-repository-save)
-                         ))
-         )
-  :bind (("<f2>" . bm-next)
-         ("S-<f2>" . bm-previous)
-         ("C-<f2>" . bm-toggle))
-  )
-
-(use-package keyfreq
-  :straight t
-  :hook
-  (after-init . keyfreq-mode)
-  (after-init . keyfreq-autosave-mode))
 
 ;;; in bat mode, treat _ as a word constitutent
 (add-hook 'bat-mode-hook #'(lambda () (modify-syntax-entry ?_ "w")))
@@ -1548,6 +1461,12 @@
  :group 'Dired
  :key "C-0 w"
  :description "copy absolute path of file under point")
+
+(cheatsheet-add
+ :group 'Dired
+ :key "C-x C-j"
+ :description "If the buffer visits a file, this command will
+ move point to that file's line in the Dired buffer it shows")
 
 (provide 'init)
 ;;; init.el ends here
