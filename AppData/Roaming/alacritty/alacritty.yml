@@ -1,7 +1,7 @@
 shell:
   program: "wsl.exe"
   args:
-    - "-d Ubuntu-18.04"
+    - "-d Ubuntu"
 
 window:
   dimensions:
