@@ -47,6 +47,9 @@
 ;; try the following for unicode characters
 ;; (setq inhibit-compacting-font-caches t)
 
+;; Emacs "updates" its ui more often than it needs to, so we slow it down
+;; slightly from 0.5s:
+(setq idle-update-delay 1.0)
 
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
