@@ -667,6 +667,7 @@
 
 (use-package projectile
   :straight t
+  :disabled t
   :custom
   (projectile-mode-line-prefix " P")
   (projectile-completion-system 'ivy)
