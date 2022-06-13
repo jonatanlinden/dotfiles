@@ -683,6 +683,7 @@
   )
 
 (use-package counsel-projectile
+  :disabled t
   :straight t
   :after (projectile counsel)
   :hook
@@ -844,6 +845,7 @@
   :straight t
   :mode ("\\.json\\'" "\\.tmpl\\'" "\\.eslintrc\\'")
   :init (setq-default js-indent-level 2))
+
 
 
 ;; Show changes in fringe
