@@ -55,5 +55,8 @@
 (cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
       (*is-mac* (add-to-list 'default-frame-alist '(font . "SF Mono-13"))))
 
+;; make UTF-8 the default coding system:
+(set-language-environment "UTF-8")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; early-init.el ends here
