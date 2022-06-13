@@ -2,7 +2,7 @@
 
 ;; For inspiration: https://emacs.nasy.moe/
 ;; https://ladicle.com/post/config
-(setq esup-child-profile-require-level 0)
+;;(setq esup-child-profile-require-level 0)
 ;; List available fonts in *Messages* buffer
 ;;(message
 ;; (mapconcat (quote identity)
@@ -92,6 +92,7 @@
     (w32-register-hot-key [s-])
     (w32-register-hot-key [s-p])
     (w32-register-hot-key [s-f])
+    (w32-register-hot-key [s-F])
     ))
 
 
@@ -173,14 +174,6 @@
 ;; revert buffers automatically when underlying files are changed externally
 (global-auto-revert-mode t)
 
-(prefer-coding-system 'utf-8)
-(set-default-coding-systems 'utf-8)
-(set-terminal-coding-system 'utf-8)
-(set-language-environment 'utf-8)
-(set-keyboard-coding-system 'utf-8)
-(setq locale-coding-system 'utf-8)
-(set-selection-coding-system 'utf-8)
-(setq-default buffer-file-coding-system 'utf-8-unix)
 (setq process-coding-system-alist
   (cons '("ruby-ls" utf-8 . utf-8) process-coding-system-alist))
 
@@ -909,6 +902,9 @@
 
 (defun jl/c-mode-common-hook ()
   (require 'smartparens-c)
+  (setq-default fill-column 79)
+  (setq-default display-fill-column-indicator-column 79)
+  (display-fill-column-indicator-mode)
   )
 
 (use-package hideif
