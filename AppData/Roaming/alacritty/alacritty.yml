@@ -1,9 +1,7 @@
 shell:
   program: "wsl.exe"
   args:
-    - "-d Ubuntu-18.04"
-
-working_directory: "~"
+    - "-d Ubuntu"
 
 window:
   dimensions:
@@ -11,17 +9,17 @@ window:
     lines: 55
 
 font:
-  size: 14.0
+  size: 11.0
   normal:
-    family: Cascadia PL
+    family: Cascadia Code PL
     style: Regular
 
   bold:
-    family: Cascadia PL
+    family: Cascadia Code PL
     style: Bold
 
   italic:
-    family: Cascadia PL
+    family: Cascadia Code PL
     style: Italic
 
 # Colors (Base16 Default Dark)
@@ -62,3 +60,4 @@ colors:
 key_bindings:
   # remove the line below!
   - { key: W, mods: Command, action: Quit }
+  - { key: Space, mods: Control, chars: "\x00" }

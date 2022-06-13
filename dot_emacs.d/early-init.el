@@ -4,8 +4,6 @@
 ;; each 50MB of allocated data (the default is on every 0.76MB)
 (setq gc-cons-threshold (* 128 1024 1024))
 
-(defvar before-init-time (current-time) "Time when init.el was started.")
-
 (message "Starting emacs %s" (current-time-string))
 
 (defun jl/reset-gc-threshold ()
@@ -47,6 +45,9 @@
 ;; try the following for unicode characters
 ;; (setq inhibit-compacting-font-caches t)
 
+;; Emacs "updates" its ui more often than it needs to, so we slow it down
+;; slightly from 0.5s:
+(setq idle-update-delay 1.0)
 
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
