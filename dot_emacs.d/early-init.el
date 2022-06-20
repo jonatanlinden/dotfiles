@@ -52,7 +52,10 @@
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
 
-(cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
+;; disable startup screen and message
+(setq inhibit-startup-screen t)
+
+(cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code PL 10")))
       (*is-mac* (add-to-list 'default-frame-alist '(font . "SF Mono-13"))))
 
 ;; make UTF-8 the default coding system:
