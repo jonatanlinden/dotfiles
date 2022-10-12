@@ -21,5 +21,11 @@
         (subword-backward-kill 1)
       (backward-kill-word 1))))
 
+
+(defun format-xml ()
+  (interactive)
+  (shell-command-on-region 1 (point-max) "xmllint --format -" (current-buffer) t)
+)
+
 (provide 'utils)
 ;;; utils.el ends here

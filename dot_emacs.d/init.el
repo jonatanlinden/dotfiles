@@ -1310,6 +1310,7 @@
   :hook
   (ediff-before-setup . store-pre-ediff-winconfig)
   (ediff-quit . restore-pre-ediff-winconfig)
+  (ediff-startup . (lambda () (ws-butler-mode nil)))
   )
 
 (use-package dumb-jump
