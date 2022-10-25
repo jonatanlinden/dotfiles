@@ -294,7 +294,7 @@
 
 
 (use-package exec-path-from-shell
-  :if (memq window-system '(mac ns x))
+  :disabled t
   :straight t
   ;; make it faster (assuming all envs in .zshenv)
   :custom (exec-path-from-shell-arguments '("-l" "-d"))
@@ -933,39 +933,6 @@
 ;; FIX prevent bug in smartparens
 ;; (setq sp-escape-quotes-after-insert nil)
 
-(use-package irony
-  :straight t
-  :commands irony-mode
-  :bind ((:map irony-mode-map
-      ([remap completion-at-point] . counsel-irony))
-         )
-  :config
-  (unless (or *is-win* (irony--find-server-executable))
-    (call-interactively #'irony-install-server))
-  (setq w32-pipe-read-delay 0)
-  :hook ((irony-mode . irony-cdb-autosetup-compile-options)
-         (c++-mode . irony-mode))
-  )
-
-(use-package company-irony-c-headers
-  :after (irony company)
-  :straight t
-  )
-
-(use-package company-irony
-  :after (irony company)
-  :straight t
-  :hook (irony-mode . (lambda ()
-                        (add-to-list (make-local-variable 'company-backends) '(company-irony-c-headers company-irony)))))
-
-
-
-(use-package irony-eldoc
-  :after irony
-  :disabled t
-  :straight t
-  :hook irony-mode)
-
 (use-package cc-mode
   :defer t
   :bind* (:map c-mode-base-map
@@ -980,7 +947,9 @@
   ([remap kill-sexp] . sp-kill-hybrid-sexp)
   (:map c++-mode-map
         ("C-c C-o" . ff-find-other-file))
-  :hook (c++-mode . jl/c++-mode-hook)
+  :hook
+  (c++-mode . jl/c++-mode-hook)
+  (c++-mode . lsp)
   )
 
 (use-package modern-cpp-font-lock
