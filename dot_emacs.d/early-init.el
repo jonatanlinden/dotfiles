@@ -26,6 +26,7 @@
 
 (defvar *is-mac* (eq system-type 'darwin))
 (defvar *is-win* (eq system-type 'windows-nt))
+(defvar *is-linux* (eq system-type 'gnu/linux))
 
 
 
@@ -52,14 +53,10 @@
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
 
-;; disable startup screen and message
-(setq inhibit-startup-screen t)
-
-(cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code PL 10")))
-      (*is-mac* (add-to-list 'default-frame-alist '(font . "SF Mono-13"))))
-
-;; make UTF-8 the default coding system:
-(set-language-environment "UTF-8")
+(cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
+      (*is-linux* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
+      (*is-mac* (add-to-list 'default-frame-alist '(font . "SF Mono-13")))
+      )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; early-init.el ends here

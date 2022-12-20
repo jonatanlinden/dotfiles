@@ -2,7 +2,7 @@
 
 ;; For inspiration: https://emacs.nasy.moe/
 ;; https://ladicle.com/post/config
-;;(setq esup-child-profile-require-level 0)
+(setq esup-child-profile-require-level 0)
 ;; List available fonts in *Messages* buffer
 ;;(message
 ;; (mapconcat (quote identity)
@@ -83,9 +83,6 @@
     ('light (load-theme 'solarized-light t))
     ('dark (load-theme 'solarized-dark t))))
 
-(when *is-win*
-  (set-selection-coding-system 'utf-16-le-dos))
-
 (when *is-mac*
   (add-hook 'ns-system-appearance-change-functions #'jl/apply-theme))
 
@@ -95,7 +92,6 @@
     (w32-register-hot-key [s-])
     (w32-register-hot-key [s-p])
     (w32-register-hot-key [s-f])
-    (w32-register-hot-key [s-F])
     ))
 
 
@@ -126,6 +122,8 @@
 ;; disable the annoying bell ring
 (setq ring-bell-function 'ignore)
 
+;; disable startup screen
+(setq inhibit-startup-screen t)
 
 ;; Time-stamp: <> in the first 8 lines?
 (add-hook 'before-save-hook 'time-stamp)
@@ -175,6 +173,14 @@
 ;; revert buffers automatically when underlying files are changed externally
 (global-auto-revert-mode t)
 
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-language-environment 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+(setq locale-coding-system 'utf-8)
+(set-selection-coding-system 'utf-8)
+(setq-default buffer-file-coding-system 'utf-8-unix)
 (setq process-coding-system-alist
   (cons '("ruby-ls" utf-8 . utf-8) process-coding-system-alist))
 
@@ -263,10 +269,11 @@
 
 (use-package utils
   :load-path "lisp"
+  :commands (kill-region-or-backward-word)
   :bind (("C-w" . kill-region-or-backward-word)
-          (:map emacs-lisp-mode-map
-                ([remap eval-last-sexp] . jl/eval-last-sexp-or-region))
-          )
+         (:map emacs-lisp-mode-map
+               ([remap eval-last-sexp] . jl/eval-last-sexp-or-region))
+         )
   )
 
 ;; manage elpa keys
@@ -308,11 +315,11 @@
   :custom
   (solarized-scale-org-headlines nil)
   (solarized-use-variable-pitch nil)
-  (solarized-height-minus-1 1.0)
-  (solarized-height-plus-1 1.0)
-  (solarized-height-plus-2 1.0)
-  (solarized-height-plus-3 1.0)
-  (solarized-height-plus-4 1.0)
+  (solarized-height-minus-1 1)
+  (solarized-height-plus-1 1)
+  (solarized-height-plus-2 1)
+  (solarized-height-plus-3 1)
+  (solarized-height-plus-4 1)
   :init
   (load-theme 'solarized-light t)
   ;;(set-face-background 'default "#fdfdf0")
@@ -324,12 +331,13 @@
   :init (load-theme 'sanityinc-tomorrow-night)
   )
 
-(use-package mood-line
+(use-package doom-modeline
   :straight t
-  :custom
-  (mood-line-show-eol-style t)
-  (mood-line-show-encoding-information t)
-  :hook (after-init . mood-line-mode))
+  :init
+  (setq doom-modeline-icon nil)
+  (setq doom-modeline-height 18)
+  (setq doom-modeline-buffer-file-name-style 'buffer-name)
+  (doom-modeline-mode 1))
 
 (use-package which-func
   :config
@@ -691,7 +699,6 @@
   )
 
 (use-package counsel-projectile
-  :disabled t
   :straight t
   :after (projectile counsel)
   :hook
@@ -855,7 +862,6 @@
   :init (setq-default js-indent-level 2))
 
 
-
 ;; Show changes in fringe
 (use-package diff-hl
   :straight t
@@ -917,9 +923,6 @@
 
 (defun jl/c-mode-common-hook ()
   (require 'smartparens-c)
-  (setq-default fill-column 79)
-  (setq-default display-fill-column-indicator-column 79)
-  (display-fill-column-indicator-mode)
   )
 
 (use-package hideif
@@ -939,7 +942,12 @@
                ("C-c C-o" . ff-find-other-file))
   :config
   (setq c-default-style "k&r"
-        c-basic-offset 2))
+        c-basic-offset 2)
+  )
+
+(use-package sqlite-mode
+  :mode "\\.db\\'"
+  )
 
 (use-package c++-mode
   :after smartparens
@@ -947,15 +955,35 @@
   ([remap kill-sexp] . sp-kill-hybrid-sexp)
   (:map c++-mode-map
         ("C-c C-o" . ff-find-other-file))
-  :hook
-  (c++-mode . jl/c++-mode-hook)
-  (c++-mode . lsp)
+  :hook (c++-mode . jl/c++-mode-hook)
+  (c++-mode . lsp-mode)
   )
 
 (use-package modern-cpp-font-lock
   :after c++-mode
   :straight t)
 
+(use-package general
+  :straight t
+)
+
+
+(general-define-key
+ "C-w" 'kill-region-or-backward-word
+ "C-x O" '(other-window-prev :which-key "previous window")
+ ;; use hippie-expand instead of dabbrev
+ "M-/" 'hippie-expand
+ "s-/" 'hippie-expand
+ ;; align code
+ "C-x \\" 'align-regexp
+ ;; mark-end-of-sentence is normally unassigned
+ "M-h" 'mark-end-of-sentence
+ ;; rebind to zap-up-to-char instead of zap-to-char
+ "M-z" 'zap-up-to-char)
+
+(general-define-key
+ :keymaps 'prog-mode-map
+ "s-f" 'mark-defun)
 
 (use-package mark-thing-at
   :straight t
@@ -963,7 +991,9 @@
 
 ;;; open current file in explorer/finder
 (when *is-win*
-  (bind-key "M-O" #'jl/open-folder-in-explorer))
+      (general-define-key
+       "M-O" #'jl/open-folder-in-explorer
+       ))
 
 (use-package reveal-in-osx-finder
   :straight t
@@ -1129,7 +1159,7 @@
            "* TODO %i%? %a")
           ))
   (setq org-todo-keywords '((sequence "OPEN" "IN PROGRESS" "|" "CLOSED")))
-  :hook (org-mode . visual-line-mode)
+  ;; :hook (org-mode . visual-line-mode) Doesn't play nice with ejira
   )
 
 (use-package org-mru-clock
@@ -1143,6 +1173,7 @@
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 
 (use-package ox-pandoc
+  :disabled t
   :straight t
   :after ox
   )
