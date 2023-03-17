@@ -234,25 +234,6 @@
 (bind-key "M-l" 'downcase-dwim)
 (bind-key "M-u" 'upcase-dwim)
 
-(bind-keys
- ("C-x O" . other-window-prev)
- ;; use hippie-expand instead of dabbrev
- ("M-/" . hippie-expand)
- ("s-/" . hippie-expand)
- ;; align code
- ("C-x \\" . align-regexp)
- ;; mark-end-of-sentence is normally unassigned
- ("M-h" . mark-end-of-sentence)
- ;; rebind to zap-up-to-char instead of zap-to-char
- ("M-z" . zap-up-to-char)
- ;; switch between buffers fast
- ("<f1>" . previous-buffer)
- ("<f2>" . next-buffer)
- )
-
-(bind-key "s-f" 'mark-defun prog-mode-map)
-
-
 (use-package no-littering
   :straight t
   :init
@@ -301,7 +282,7 @@
 
 
 (use-package exec-path-from-shell
-  :disabled t
+  :if (memq window-system '(mac ns x))
   :straight t
   ;; make it faster (assuming all envs in .zshenv)
   :custom (exec-path-from-shell-arguments '("-l" "-d"))
@@ -535,6 +516,9 @@
   (("M-x" . counsel-M-x)
    ("C-x C-m" . counsel-M-x)
    ("C-x C-f" . counsel-find-file)
+   ("<f1> f" . counsel-describe-function)
+   ("<f1> v" . counsel-describe-variable)
+   ("<f1> l" . counsel-find-library)
    ;;("C-c g" . counsel-git)
    ("C-c j" . counsel-git-grep)
    ("C-c r" . counsel-rg)
