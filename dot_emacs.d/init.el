@@ -43,6 +43,9 @@
 
 (defconst jonatan-personal-preload (expand-file-name "personal/preload.el" user-emacs-directory))
 
+(when (> emacs-major-version 28)
+  ((pixel-scroll-precision-mode)))
+
 (when (file-exists-p jonatan-personal-preload)
   (load jonatan-personal-preload))
 
@@ -173,14 +176,9 @@
 ;; revert buffers automatically when underlying files are changed externally
 (global-auto-revert-mode t)
 
-(prefer-coding-system 'utf-8)
-(set-default-coding-systems 'utf-8)
-(set-terminal-coding-system 'utf-8)
-(set-language-environment 'utf-8)
-(set-keyboard-coding-system 'utf-8)
-(setq locale-coding-system 'utf-8)
-(set-selection-coding-system 'utf-8)
-(setq-default buffer-file-coding-system 'utf-8-unix)
+;; handle files with long lines
+(global-so-long-mode 1)
+
 (setq process-coding-system-alist
   (cons '("ruby-ls" utf-8 . utf-8) process-coding-system-alist))
 
@@ -509,6 +507,7 @@
   (counsel-grep-base-command
    "rg -i -M 120 --no-heading --line-number --color never %s %s")
   (counsel-grep-swiper-limit 30000)
+  (counsel-async-command-delay 0.5)
   :config
   (if *is-win*
       (setq counsel-git-log-cmd "set GIT_PAGER=cat && git log --grep \"%s\""))
@@ -769,6 +768,7 @@
   :custom (ruby-align-chained-calls t)
   :config
   (use-package smartparens-ruby)
+  (which-func-mode -1)
   :hook
   (ruby-mode . subword-mode)
   (ruby-mode . lsp)
@@ -840,11 +840,14 @@
   :disabled t
   )
 
-(use-package json-mode
+
+
+(use-package jsonian
   :straight t
   :mode ("\\.json\\'" "\\.tmpl\\'" "\\.eslintrc\\'")
-  :init (setq-default js-indent-level 2))
-
+  :after so-long
+  :custom
+  (jsonian-no-so-long-mode))
 
 ;; Show changes in fringe
 (use-package diff-hl
@@ -919,6 +922,39 @@
 
 ;; FIX prevent bug in smartparens
 ;; (setq sp-escape-quotes-after-insert nil)
+
+(use-package irony
+  :straight t
+  :commands irony-mode
+  :bind ((:map irony-mode-map
+      ([remap completion-at-point] . counsel-irony))
+         )
+  :config
+  (unless (or *is-win* (irony--find-server-executable))
+    (call-interactively #'irony-install-server))
+  (setq w32-pipe-read-delay 0)
+  :hook ((irony-mode . irony-cdb-autosetup-compile-options)
+         (c++-mode . irony-mode))
+  )
+
+(use-package company-irony-c-headers
+  :after (irony company)
+  :straight t
+  )
+
+(use-package company-irony
+  :after (irony company)
+  :straight t
+  :hook (irony-mode . (lambda ()
+                        (add-to-list (make-local-variable 'company-backends) '(company-irony-c-headers company-irony)))))
+
+
+
+(use-package irony-eldoc
+  :after irony
+  :disabled t
+  :straight t
+  :hook irony-mode)
 
 (use-package cc-mode
   :defer t
@@ -1244,10 +1280,6 @@
   ;; Enable magit-show-commit instead of pop-to-buffer
   (setq git-messenger:show-detail t))
 
-(use-package git-timemachine
-  :commands (git-timemachine)
-  :straight t)
-
 (use-package magit-svn
   :straight t
   :diminish magit-svn-mode
@@ -1361,6 +1393,21 @@
 (use-package jl-ocaml
   :load-path "lisp"
   )
+
+(use-package go-mode
+  :straight t
+  :bind (
+         ;; If you want to switch existing go-mode bindings to use lsp-mode/gopls instead
+         ;; uncomment the following lines
+         ;; ("C-c C-j" . lsp-find-definition)
+         ;; ("C-c C-d" . lsp-describe-thing-at-point)
+         )
+  :hook ((go-mode . lsp-deferred)))
+
+(use-package csv-mode
+  :straight t
+  :mode ("\\.csv\\'")
+  :hook (csv-mode . csv-guess-set-separator))
 
 (cheatsheet-add
  :group 'General
