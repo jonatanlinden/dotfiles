@@ -44,7 +44,7 @@
 (defconst jonatan-personal-preload (expand-file-name "personal/preload.el" user-emacs-directory))
 
 (when (> emacs-major-version 28)
-  ((pixel-scroll-precision-mode)))
+ (pixel-scroll-precision-mode))
 
 (when (file-exists-p jonatan-personal-preload)
   (load jonatan-personal-preload))
@@ -562,6 +562,16 @@
 
 (put 'dired-find-alternate-file 'disabled nil)
 
+(defun jl/prog-mode-hook ()
+  ;; causes projectile to choke?
+  ;; (make-local-variable 'company-backends)
+  ;; (push 'company-keywords company-backends)
+  ;; show trailing whitespace in editor
+  ;; (dumb-jump-mode)
+  (setq show-trailing-whitespace t)
+  ;;(setq show-tabs)
+  )
+
 (use-package company
   :straight t
   ;; :diminish (company-mode . "(c)")
@@ -591,15 +601,7 @@
   :straight t
   :hook (company-mode . company-prescient-mode))
 
-(defun jl/prog-mode-hook ()
-  ;; causes projectile to choke?
-  ;; (make-local-variable 'company-backends)
-  ;; (push 'company-keywords company-backends)
-  ;; show trailing whitespace in editor
-  ;; (dumb-jump-mode)
-  (setq show-trailing-whitespace t)
-  ;;(setq show-tabs)
-  )
+
 
 
 ;(use-package expand-region
