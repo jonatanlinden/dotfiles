@@ -8,6 +8,7 @@ for dump in ~/.zcompdump(N.mh+24); do
 done
 compinit -C
 
+
 ## History file configuration
 [ -z "$HISTFILE" ] && HISTFILE="$HOME/.history"
 HISTSIZE=50000
@@ -31,6 +32,7 @@ function env_default() {
     export "$1=$2"       && return 3
 }
 
+# Set up a custom prompt showing the node version being used
 NVM_PROMPT_PREFIX="(⬡ "
 NVM_PROMPT_SUFFIX=")"
 # get the node.js version
@@ -43,7 +45,9 @@ function nvm_prompt_info() {
   echo "${NVM_PROMPT_PREFIX}${nvm_prompt}${NVM_PROMPT_SUFFIX}"
 }
 
+# By default, don't load nvm, and don't show any prompt
 export NVM_NO_USE=true
+
 
 # must occur before zsh-syntax-highlighting due to bug. (loaded in .zsh_plugins.sh)
 autoload -Uz select-word-style
@@ -51,9 +55,9 @@ select-word-style default
 zstyle ':zle:*' word-chars " /:@+|"
 zstyle ':zle:*' word-style unspecified
 
-source ~/.zsh_plugins.sh
+source ~/.zsh_plugins.zsh
 
-RPROMPT='$(nvm_prompt_info)'
+
 
 bindkey -M emacs '^P' history-substring-search-up
 bindkey -M emacs '^N' history-substring-search-down
@@ -62,6 +66,11 @@ bindkey -e
 
 # load modules
 autoload -U zmv
+
+autoload -U promptinit; promptinit
+prompt pure
+
+
 
 # fix issue in iterm?
 export COLUMNS
@@ -149,3 +158,14 @@ rbenv() {
 }
 
 # zprof
+
+
+# source antidote
+source /usr/local/opt/antidote/share/antidote/antidote.zsh
+
+
+
+# initialize plugins statically with ${ZDOTDIR:-~}/.zsh_plugins.txt
+# antidote load
+
+RPROMPT='$(nvm_prompt_info)'
