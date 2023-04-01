@@ -278,16 +278,6 @@
     ;; needed for the server to start on Windows.
     (defun server-ensure-safe-dir (dir) "Noop" t)))
 
-
-(use-package exec-path-from-shell
-  :if (memq window-system '(mac ns x))
-  :straight t
-  ;; make it faster (assuming all envs in .zshenv)
-  :custom (exec-path-from-shell-arguments '("-l" "-d"))
-  :config
-  (exec-path-from-shell-copy-envs '("LC_ALL" "PYTHONPATH"))
-  (exec-path-from-shell-initialize))
-
 (use-package solarized-theme
   :if window-system
   :straight t
