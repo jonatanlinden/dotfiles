@@ -20,5 +20,5 @@ fi
 
 
 eval $(keychain --eval id_ed25519)
-eval "$(rbenv init -)"
+eval "$(rbenv init - bash)"
 eval "$(starship init bash)"
