@@ -129,6 +129,8 @@
 ;; disable the annoying bell ring
 (setq ring-bell-function 'ignore)
 
+;; disable startup screen
+(setq inhibit-startup-screen t)
 
 ;; Time-stamp: <> in the first 8 lines?
 (add-hook 'before-save-hook 'time-stamp)
