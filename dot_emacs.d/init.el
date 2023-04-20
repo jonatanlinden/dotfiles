@@ -2,7 +2,7 @@
 
 ;; For inspiration: https://emacs.nasy.moe/
 ;; https://ladicle.com/post/config
-(setq esup-child-profile-require-level 0)
+;;(setq esup-child-profile-require-level 0)
 ;; List available fonts in *Messages* buffer
 ;;(message
 ;; (mapconcat (quote identity)
@@ -43,8 +43,8 @@
 
 (defconst jonatan-personal-preload (expand-file-name "personal/preload.el" user-emacs-directory))
 
-(when (> emacs-major-version 28)
- (pixel-scroll-precision-mode))
+(when (< emacs-major-version 28)
+  ((pixel-scroll-precision-mode)))
 
 (when (file-exists-p jonatan-personal-preload)
   (load jonatan-personal-preload))
@@ -86,6 +86,9 @@
     ('light (load-theme 'solarized-light t))
     ('dark (load-theme 'solarized-dark t))))
 
+(when *is-win*
+  (set-selection-coding-system 'utf-16-le-dos))
+
 (when *is-mac*
   (add-hook 'ns-system-appearance-change-functions #'jl/apply-theme))
 
@@ -95,6 +98,7 @@
     (w32-register-hot-key [s-])
     (w32-register-hot-key [s-p])
     (w32-register-hot-key [s-f])
+    (w32-register-hot-key [s-F])
     ))
 
 
@@ -125,8 +129,6 @@
 ;; disable the annoying bell ring
 (setq ring-bell-function 'ignore)
 
-;; disable startup screen
-(setq inhibit-startup-screen t)
 
 ;; Time-stamp: <> in the first 8 lines?
 (add-hook 'before-save-hook 'time-stamp)
@@ -232,6 +234,25 @@
 (bind-key "M-l" 'downcase-dwim)
 (bind-key "M-u" 'upcase-dwim)
 
+(bind-keys
+ ("C-x O" . other-window-prev)
+ ;; use hippie-expand instead of dabbrev
+ ("M-/" . hippie-expand)
+ ("s-/" . hippie-expand)
+ ;; align code
+ ("C-x \\" . align-regexp)
+ ;; mark-end-of-sentence is normally unassigned
+ ("M-h" . mark-end-of-sentence)
+ ;; rebind to zap-up-to-char instead of zap-to-char
+ ("M-z" . zap-up-to-char)
+ ;; switch between buffers fast
+ ("<f1>" . previous-buffer)
+ ("<f2>" . next-buffer)
+ )
+
+(bind-key "s-f" 'mark-defun prog-mode-map)
+
+
 (use-package no-littering
   :straight t
   :init
@@ -248,11 +269,10 @@
 
 (use-package utils
   :load-path "lisp"
-  :commands (kill-region-or-backward-word)
   :bind (("C-w" . kill-region-or-backward-word)
-         (:map emacs-lisp-mode-map
-               ([remap eval-last-sexp] . jl/eval-last-sexp-or-region))
-         )
+          (:map emacs-lisp-mode-map
+                ([remap eval-last-sexp] . jl/eval-last-sexp-or-region))
+          )
   )
 
 ;; manage elpa keys
@@ -278,17 +298,27 @@
     ;; needed for the server to start on Windows.
     (defun server-ensure-safe-dir (dir) "Noop" t)))
 
+
+(use-package exec-path-from-shell
+  :if (memq window-system '(mac ns x))
+  :straight t
+  ;; make it faster (assuming all envs in .zshenv)
+  :custom (exec-path-from-shell-arguments '("-l" "-d"))
+  :config
+  (exec-path-from-shell-copy-envs '("LC_ALL" "PYTHONPATH"))
+  (exec-path-from-shell-initialize))
+
 (use-package solarized-theme
   :if window-system
   :straight t
   :custom
   (solarized-scale-org-headlines nil)
   (solarized-use-variable-pitch nil)
-  (solarized-height-minus-1 1)
-  (solarized-height-plus-1 1)
-  (solarized-height-plus-2 1)
-  (solarized-height-plus-3 1)
-  (solarized-height-plus-4 1)
+  (solarized-height-minus-1 1.0)
+  (solarized-height-plus-1 1.0)
+  (solarized-height-plus-2 1.0)
+  (solarized-height-plus-3 1.0)
+  (solarized-height-plus-4 1.0)
   :init
   (load-theme 'solarized-light t)
   ;;(set-face-background 'default "#fdfdf0")
@@ -300,13 +330,12 @@
   :init (load-theme 'sanityinc-tomorrow-night)
   )
 
-(use-package doom-modeline
+(use-package mood-line
   :straight t
-  :init
-  (setq doom-modeline-icon nil)
-  (setq doom-modeline-height 18)
-  (setq doom-modeline-buffer-file-name-style 'buffer-name)
-  (doom-modeline-mode 1))
+  :custom
+  (mood-line-show-eol-style t)
+  (mood-line-show-encoding-information t)
+  :hook (after-init . mood-line-mode))
 
 (use-package which-func
   :config
@@ -457,67 +486,7 @@
 (use-package saveplace
   :hook (after-init . save-place-mode))
 
-(use-package vertico
-  :straight t
-  :init
-  (vertico-mode +1))
-
-(use-package orderless
-  :straight t
-  :init
-  (setq completion-styles '(orderless)))
-        ;;completion-category-defaults nil
-        ;;completion-category-overrides '((file (styles partial-completion)))))
-
-
-(use-package marginalia
-  :straight t
-  :config (marginalia-mode))
-
-(use-package consult
-  :straight t
-  :bind
-  (("M-y" . consult-yank-from-kill-ring)
-   ("C-x b" . consult-buffer)
-   ("C-s" . consult-line)
-   ("C-c r" . consult-ripgrep)
-   ([remap goto-line] . consult-goto-line)
-   )
-  )
-
-;;(setq completion-ignore-case t)
-;;(setq read-file-name-completion-ignore-case t)
-
-(use-package embark
-  :straight t
-  :bind
-  (("C-." . embark-act)         ;; pick some comfortable binding
-   ("C-;" . embark-dwim)        ;; good alternative: M-.
-   ("C-h B" . embark-bindings)) ;; alternative for `describe-bindings'
-  :init
-  ;; Optionally replace the key help with a completing-read interface
-  (setq prefix-help-command #'embark-prefix-help-command)
-  :config
-  ;; Hide the mode line of the Embark live/completions buffers
-  (add-to-list 'display-buffer-alist
-               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
-                 nil
-                 (window-parameters (mode-line-format . none))))
-
-    )
-
-  ;; Consult users will also want the embark-consult package.
-  (use-package embark-consult
-    :straight t
-    :after (embark consult)
-    :demand t ; only necessary if you have the hook below
-    ;; if you want to have consult previews as you move around an
-    ;; auto-updating embark collect buffer
-    :hook
-    (embark-collect-mode . consult-preview-at-point-mode))
-
 (use-package ivy
-  :disabled t
   :straight t
   :diminish
 
@@ -545,13 +514,11 @@
    ))
 
 (use-package swiper
-  :disabled t
   :straight t
   :custom
   (swiper-action-recenter t))
 
 (use-package counsel
-  :disabled t
   :straight t
   :diminish counsel-mode ivy-mode
   :custom
@@ -567,9 +534,6 @@
   (("M-x" . counsel-M-x)
    ("C-x C-m" . counsel-M-x)
    ("C-x C-f" . counsel-find-file)
-   ("<f1> f" . counsel-describe-function)
-   ("<f1> v" . counsel-describe-variable)
-   ("<f1> l" . counsel-find-library)
    ;;("C-c g" . counsel-git)
    ("C-c j" . counsel-git-grep)
    ("C-c r" . counsel-rg)
@@ -584,7 +548,6 @@
 
 
 (use-package ivy-prescient
-  :disabled t
   :after counsel
   :straight t
   :hook (after-init . ivy-prescient-mode))
@@ -615,16 +578,6 @@
 
 (put 'dired-find-alternate-file 'disabled nil)
 
-(defun jl/prog-mode-hook ()
-  ;; causes projectile to choke?
-  ;; (make-local-variable 'company-backends)
-  ;; (push 'company-keywords company-backends)
-  ;; show trailing whitespace in editor
-  ;; (dumb-jump-mode)
-  (setq show-trailing-whitespace t)
-  ;;(setq show-tabs)
-  )
-
 (use-package company
   :straight t
   ;; :diminish (company-mode . "(c)")
@@ -654,7 +607,15 @@
   :straight t
   :hook (company-mode . company-prescient-mode))
 
-
+(defun jl/prog-mode-hook ()
+  ;; causes projectile to choke?
+  ;; (make-local-variable 'company-backends)
+  ;; (push 'company-keywords company-backends)
+  ;; show trailing whitespace in editor
+  ;; (dumb-jump-mode)
+  (setq show-trailing-whitespace t)
+  ;;(setq show-tabs)
+  )
 
 
 ;(use-package expand-region
@@ -719,6 +680,31 @@
    ("C-S-z" . 'undo-tree-redo))
   :hook (after-init . global-undo-tree-mode))
 
+(use-package projectile
+  :straight t
+  :disabled t
+  :custom
+  (projectile-mode-line-prefix " P")
+  (projectile-completion-system 'ivy)
+  (projectile-enable-caching t)
+  (projectile-indexing-method 'alien)
+  (projectile-svn-command "find . -type f -not -iwholename '*.svn/*' -print0")
+  ;; on windows,
+  :bind
+  (:map projectile-mode-map
+        ("s-p" . projectile-command-map)
+        ("s-p r" . projectile-ripgrep))
+  :init (projectile-mode +1)
+  )
+
+(use-package counsel-projectile
+  :disabled t
+  :straight t
+  :after (projectile counsel)
+  :hook
+  (after-init . counsel-projectile-mode))
+
+
 (use-package find-file-in-project
   :straight t
   :custom (ffip-use-rust-fd t)
@@ -727,7 +713,6 @@
          ("M-s-f" . find-file-in-project-by-selected)))
 
 (use-package counsel-fd
-  :disabled t
   :straight t
   :after counsel
   :commands (counsel-fd-dired-jump counsel-fd-file-jump))
@@ -873,13 +858,19 @@
   )
 
 
+(use-package json-mode
+  :disabled t
+  )
+
 
 (use-package jsonian
   :straight t
-  :mode ("\\.json\\'" "\\.tmpl\\'" "\\.eslintrc\\'")
   :after so-long
   :custom
-  (jsonian-no-so-long-mode))
+  (jsonian-no-so-long-mode)
+  :hook (flycheck-mode . jsonian-enable-flycheck)
+  )
+
 
 ;; Show changes in fringe
 (use-package diff-hl
@@ -942,6 +933,9 @@
 
 (defun jl/c-mode-common-hook ()
   (require 'smartparens-c)
+  (setq-default fill-column 79)
+  (setq-default display-fill-column-indicator-column 79)
+  (display-fill-column-indicator-mode)
   )
 
 (use-package hideif
@@ -994,12 +988,7 @@
                ("C-c C-o" . ff-find-other-file))
   :config
   (setq c-default-style "k&r"
-        c-basic-offset 2)
-  )
-
-(use-package sqlite-mode
-  :mode "\\.db\\'"
-  )
+        c-basic-offset 2))
 
 (use-package c++-mode
   :after smartparens
@@ -1008,34 +997,12 @@
   (:map c++-mode-map
         ("C-c C-o" . ff-find-other-file))
   :hook (c++-mode . jl/c++-mode-hook)
-  (c++-mode . lsp-mode)
   )
 
 (use-package modern-cpp-font-lock
   :after c++-mode
   :straight t)
 
-(use-package general
-  :straight t
-)
-
-
-(general-define-key
- "C-w" 'kill-region-or-backward-word
- "C-x O" '(other-window-prev :which-key "previous window")
- ;; use hippie-expand instead of dabbrev
- "M-/" 'hippie-expand
- "s-/" 'hippie-expand
- ;; align code
- "C-x \\" 'align-regexp
- ;; mark-end-of-sentence is normally unassigned
- "M-h" 'mark-end-of-sentence
- ;; rebind to zap-up-to-char instead of zap-to-char
- "M-z" 'zap-up-to-char)
-
-(general-define-key
- :keymaps 'prog-mode-map
- "s-f" 'mark-defun)
 
 (use-package mark-thing-at
   :straight t
@@ -1043,9 +1010,7 @@
 
 ;;; open current file in explorer/finder
 (when *is-win*
-      (general-define-key
-       "M-O" #'jl/open-folder-in-explorer
-       ))
+  (bind-key "M-O" #'jl/open-folder-in-explorer))
 
 (use-package reveal-in-osx-finder
   :straight t
@@ -1210,8 +1175,9 @@
            (file+headline "d:/work/notes/todo.org" "Tasks")
            "* TODO %i%? %a")
           ))
-  (setq org-todo-keywords '((sequence "OPEN" "IN PROGRESS" "|" "CLOSED")))
-  ;; :hook (org-mode . visual-line-mode) Doesn't play nice with ejira
+  (setq org-todo-keywords
+   '((sequence "TODO(t)" "IN PROGRESS(p)" | "DONE(d!)")))
+  :hook (org-mode . visual-line-mode)
   )
 
 (use-package org-mru-clock
@@ -1225,7 +1191,6 @@
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 
 (use-package ox-pandoc
-  :disabled t
   :straight t
   :after ox
   )
@@ -1294,6 +1259,10 @@
          ("C-c g l" . magit-list-repositories)
          )
   :hook (magit-mode . magit-svn-mode))
+
+(use-package magit-delta
+  :straight t
+  :hook (magit-mode . magit-delta-mode))
 
 ;; Transient commands: replaces the old magit-popup
 (use-package transient :defer t
@@ -1440,11 +1409,6 @@
   :straight t
   :mode ("\\.csv\\'")
   :hook (csv-mode . csv-guess-set-separator))
-
-(use-package js2-mode
-  :straight t
-  :custom (js2-basic-offset 2)
-  )
 
 (cheatsheet-add
  :group 'General
