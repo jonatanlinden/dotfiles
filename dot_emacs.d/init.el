@@ -457,7 +457,67 @@
 (use-package saveplace
   :hook (after-init . save-place-mode))
 
+(use-package vertico
+  :straight t
+  :init
+  (vertico-mode +1))
+
+(use-package orderless
+  :straight t
+  :init
+  (setq completion-styles '(orderless)))
+        ;;completion-category-defaults nil
+        ;;completion-category-overrides '((file (styles partial-completion)))))
+
+
+(use-package marginalia
+  :straight t
+  :config (marginalia-mode))
+
+(use-package consult
+  :straight t
+  :bind
+  (("M-y" . consult-yank-from-kill-ring)
+   ("C-x b" . consult-buffer)
+   ("C-s" . consult-line)
+   ("C-c r" . consult-ripgrep)
+   ([remap goto-line] . consult-goto-line)
+   )
+  )
+
+;;(setq completion-ignore-case t)
+;;(setq read-file-name-completion-ignore-case t)
+
+(use-package embark
+  :straight t
+  :bind
+  (("C-." . embark-act)         ;; pick some comfortable binding
+   ("C-;" . embark-dwim)        ;; good alternative: M-.
+   ("C-h B" . embark-bindings)) ;; alternative for `describe-bindings'
+  :init
+  ;; Optionally replace the key help with a completing-read interface
+  (setq prefix-help-command #'embark-prefix-help-command)
+  :config
+  ;; Hide the mode line of the Embark live/completions buffers
+  (add-to-list 'display-buffer-alist
+               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
+                 nil
+                 (window-parameters (mode-line-format . none))))
+
+    )
+
+  ;; Consult users will also want the embark-consult package.
+  (use-package embark-consult
+    :straight t
+    :after (embark consult)
+    :demand t ; only necessary if you have the hook below
+    ;; if you want to have consult previews as you move around an
+    ;; auto-updating embark collect buffer
+    :hook
+    (embark-collect-mode . consult-preview-at-point-mode))
+
 (use-package ivy
+  :disabled t
   :straight t
   :diminish
 
@@ -485,11 +545,13 @@
    ))
 
 (use-package swiper
+  :disabled t
   :straight t
   :custom
   (swiper-action-recenter t))
 
 (use-package counsel
+  :disabled t
   :straight t
   :diminish counsel-mode ivy-mode
   :custom
@@ -522,6 +584,7 @@
 
 
 (use-package ivy-prescient
+  :disabled t
   :after counsel
   :straight t
   :hook (after-init . ivy-prescient-mode))
@@ -656,30 +719,6 @@
    ("C-S-z" . 'undo-tree-redo))
   :hook (after-init . global-undo-tree-mode))
 
-(use-package projectile
-  :straight t
-  :disabled t
-  :custom
-  (projectile-mode-line-prefix " P")
-  (projectile-completion-system 'ivy)
-  (projectile-enable-caching t)
-  (projectile-indexing-method 'alien)
-  (projectile-svn-command "find . -type f -not -iwholename '*.svn/*' -print0")
-  ;; on windows,
-  :bind
-  (:map projectile-mode-map
-        ("s-p" . projectile-command-map)
-        ("s-p r" . projectile-ripgrep))
-  :init (projectile-mode +1)
-  )
-
-(use-package counsel-projectile
-  :straight t
-  :after (projectile counsel)
-  :hook
-  (after-init . counsel-projectile-mode))
-
-
 (use-package find-file-in-project
   :straight t
   :custom (ffip-use-rust-fd t)
@@ -688,6 +727,7 @@
          ("M-s-f" . find-file-in-project-by-selected)))
 
 (use-package counsel-fd
+  :disabled t
   :straight t
   :after counsel
   :commands (counsel-fd-dired-jump counsel-fd-file-jump))
@@ -1400,6 +1440,11 @@
   :straight t
   :mode ("\\.csv\\'")
   :hook (csv-mode . csv-guess-set-separator))
+
+(use-package js2-mode
+  :straight t
+  :custom (js2-basic-offset 2)
+  )
 
 (cheatsheet-add
  :group 'General
