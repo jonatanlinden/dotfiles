@@ -488,11 +488,9 @@
 
 (use-package orderless
   :straight t
-  :init
-  (setq completion-styles '(orderless)))
-        ;;completion-category-defaults nil
-        ;;completion-category-overrides '((file (styles partial-completion)))))
-
+  :custom
+  (completion-styles '(orderless basic))
+  (completion-category-overrides '((file (styles basic partial-completion)))))
 
 (use-package marginalia
   :straight t
@@ -507,6 +505,14 @@
    ("C-c r" . consult-ripgrep)
    ([remap goto-line] . consult-goto-line)
    )
+  :config
+  (consult-customize consult-buffer
+                     :preview-key "M-.")
+  (consult-customize consult-line
+                   consult-ripgrep
+                   :initial (when (use-region-p)
+                              (buffer-substring-no-properties
+                               (region-beginning) (region-end))))
   )
 
 ;;(setq completion-ignore-case t)
@@ -1037,7 +1043,7 @@
   (:map c++-mode-map
         ("C-c C-o" . ff-find-other-file))
   :hook (c++-mode . jl/c++-mode-hook)
-  (c++-mode . lsp-mode)
+  (lsp)
   )
 
 (use-package modern-cpp-font-lock
@@ -1226,8 +1232,7 @@
   :bind* (("C-c C-x i" . org-mru-clock-in)
           ("C-c C-x C-j" . org-mru-clock-select-recent-task))
   :custom
-  (org-mru-clock-how-many 10)
-  (org-mru-clock-completing-read #'ivy-completing-read))
+  (org-mru-clock-how-many 10))
 
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 
