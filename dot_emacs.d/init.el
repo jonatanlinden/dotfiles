@@ -338,7 +338,7 @@
   (setq-default header-line-format '(which-func-mode ("" which-func-format " ")))
   (setq mode-line-misc-info
         (assq-delete-all 'which-function-mode mode-line-misc-info))
-  :hook (prog-mode . which-function-mode))
+  :hook (c++-mode . which-function-mode))
 
 (use-package paren
   :hook (after-init . show-paren-mode)
@@ -639,6 +639,16 @@
 
 (put 'dired-find-alternate-file 'disabled nil)
 
+(defun jl/prog-mode-hook ()
+  ;; causes projectile to choke?
+  ;; (make-local-variable 'company-backends)
+  ;; (push 'company-keywords company-backends)
+  ;; show trailing whitespace in editor
+  ;; (dumb-jump-mode)
+  (setq show-trailing-whitespace t)
+  ;;(setq show-tabs)
+  )
+
 (use-package company
   :straight t
   ;; :diminish (company-mode . "(c)")
@@ -667,16 +677,6 @@
   :after (prescient company)
   :straight t
   :hook (company-mode . company-prescient-mode))
-
-(defun jl/prog-mode-hook ()
-  ;; causes projectile to choke?
-  ;; (make-local-variable 'company-backends)
-  ;; (push 'company-keywords company-backends)
-  ;; show trailing whitespace in editor
-  ;; (dumb-jump-mode)
-  (setq show-trailing-whitespace t)
-  ;;(setq show-tabs)
-  )
 
 
 ;(use-package expand-region
