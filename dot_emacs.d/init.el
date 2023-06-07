@@ -183,7 +183,10 @@
 ;; handle files with long lines
 (global-so-long-mode 1)
 
+(set-language-environment "UTF-8")
 (set-default-coding-systems 'utf-8)
+(set-keyboard-coding-system 'utf-8-unix)
+(set-terminal-coding-system 'utf-8-unix)
 
 (setq process-coding-system-alist
   (cons '("ruby-ls" utf-8 . utf-8) process-coding-system-alist))
@@ -309,11 +312,11 @@
   :custom
   (solarized-scale-org-headlines nil)
   (solarized-use-variable-pitch nil)
-  (solarized-height-minus-1 1)
-  (solarized-height-plus-1 1)
-  (solarized-height-plus-2 1)
-  (solarized-height-plus-3 1)
-  (solarized-height-plus-4 1)
+  (solarized-height-minus-1 1.0)
+  (solarized-height-plus-1 1.0)
+  (solarized-height-plus-2 1.0)
+  (solarized-height-plus-3 1.0)
+  (solarized-height-plus-4 1.0)
   :init
   (load-theme 'solarized-light t)
   ;;(set-face-background 'default "#fdfdf0")
@@ -338,7 +341,7 @@
   (setq-default header-line-format '(which-func-mode ("" which-func-format " ")))
   (setq mode-line-misc-info
         (assq-delete-all 'which-function-mode mode-line-misc-info))
-  :hook (c++-mode . which-function-mode))
+  :hook (prog-mode . which-function-mode))
 
 (use-package paren
   :hook (after-init . show-paren-mode)
@@ -645,16 +648,6 @@
 
 (put 'dired-find-alternate-file 'disabled nil)
 
-(defun jl/prog-mode-hook ()
-  ;; causes projectile to choke?
-  ;; (make-local-variable 'company-backends)
-  ;; (push 'company-keywords company-backends)
-  ;; show trailing whitespace in editor
-  ;; (dumb-jump-mode)
-  (setq show-trailing-whitespace t)
-  ;;(setq show-tabs)
-  )
-
 (use-package company
   :straight t
   ;; :diminish (company-mode . "(c)")
@@ -683,6 +676,16 @@
   :after (prescient company)
   :straight t
   :hook (company-mode . company-prescient-mode))
+
+(defun jl/prog-mode-hook ()
+  ;; causes projectile to choke?
+  ;; (make-local-variable 'company-backends)
+  ;; (push 'company-keywords company-backends)
+  ;; show trailing whitespace in editor
+  ;; (dumb-jump-mode)
+  (setq show-trailing-whitespace t)
+  ;;(setq show-tabs)
+  )
 
 
 ;(use-package expand-region
@@ -907,7 +910,6 @@
 
 (use-package jsonian
   :straight t
-  :mode ("\\.json\\'" "\\.tmpl\\'" "\\.eslintrc\\'")
   :after so-long
   :custom
   (jsonian-no-so-long-mode)
@@ -990,39 +992,6 @@
 
 ;; FIX prevent bug in smartparens
 ;; (setq sp-escape-quotes-after-insert nil)
-
-(use-package irony
-  :straight t
-  :commands irony-mode
-  :bind ((:map irony-mode-map
-      ([remap completion-at-point] . counsel-irony))
-         )
-  :config
-  (unless (or *is-win* (irony--find-server-executable))
-    (call-interactively #'irony-install-server))
-  (setq w32-pipe-read-delay 0)
-  :hook ((irony-mode . irony-cdb-autosetup-compile-options)
-         (c++-mode . irony-mode))
-  )
-
-(use-package company-irony-c-headers
-  :after (irony company)
-  :straight t
-  )
-
-(use-package company-irony
-  :after (irony company)
-  :straight t
-  :hook (irony-mode . (lambda ()
-                        (add-to-list (make-local-variable 'company-backends) '(company-irony-c-headers company-irony)))))
-
-
-
-(use-package irony-eldoc
-  :after irony
-  :disabled t
-  :straight t
-  :hook irony-mode)
 
 (use-package cc-mode
   :defer t
@@ -1459,6 +1428,7 @@
 
 (use-package js2-mode
   :straight t
+  :mode("\\.js\\'")
   :custom (js2-basic-offset 2)
   )
 
