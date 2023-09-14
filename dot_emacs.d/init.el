@@ -257,7 +257,30 @@
  ("<f2>" . next-buffer)
  )
 
+
+
+
 (bind-key "s-f" 'mark-defun prog-mode-map)
+
+
+(use-package org :straight (:type built-in)
+  :demand t
+
+  :custom
+  (org-export-backends '(ascii html md))
+  (org-directory "d:/work/notes")
+  (org-hide-emphasis-markers t)
+  :bind (("C-c c" . org-capture))
+  :config
+  ;; (setq org-capture-templates
+  ;;       '(("t" "Todo [inbox]" entry
+  ;;          (file+headline "d:/work/notes/todo.org" "Tasks")
+  ;;          "* TODO %i%? %a")
+  ;;         ))
+  ;; (setq org-todo-keywords
+  ;;       '((sequence "TODO(t)" "IN PROGRESS(p)" | "DONE(d!)")))
+  :hook org-mode . (lambda () (electric-indent-mode -1))
+  )
 
 
 (use-package no-littering
@@ -338,7 +361,7 @@
 (use-package which-func
   :config
   ;; Show the current function name in the header line, not in mode-line
-  (setq-default header-line-format '(which-func-mode ("" which-func-format " ")))
+  (setq-default header-line-format '(which-function-mode ("" which-func-format " ")))
   (setq mode-line-misc-info
         (assq-delete-all 'which-function-mode mode-line-misc-info))
   :hook (prog-mode . which-function-mode))
@@ -648,6 +671,16 @@
 
 (put 'dired-find-alternate-file 'disabled nil)
 
+(defun jl/prog-mode-hook ()
+  ;; causes projectile to choke?
+  ;; (make-local-variable 'company-backends)
+  ;; (push 'company-keywords company-backends)
+  ;; show trailing whitespace in editor
+  ;; (dumb-jump-mode)
+  (setq show-trailing-whitespace t)
+  ;;(setq show-tabs)
+  )
+
 (use-package company
   :straight t
   ;; :diminish (company-mode . "(c)")
@@ -676,16 +709,6 @@
   :after (prescient company)
   :straight t
   :hook (company-mode . company-prescient-mode))
-
-(defun jl/prog-mode-hook ()
-  ;; causes projectile to choke?
-  ;; (make-local-variable 'company-backends)
-  ;; (push 'company-keywords company-backends)
-  ;; show trailing whitespace in editor
-  ;; (dumb-jump-mode)
-  (setq show-trailing-whitespace t)
-  ;;(setq show-tabs)
-  )
 
 
 ;(use-package expand-region
@@ -736,7 +759,17 @@
   :commands (discover-my-major discover-my-mode)
   )
 
+(use-package vundo
+  :straight t
+  :custom
+  (vundo-glyph-alist vundo-unicode-symbols)
+  (vundo-roll-back-on-quit nil)
+  :bind (("C-z" . 'undo)
+         )
+  )
+
 (use-package undo-tree
+  :disabled t
   :straight t
   :diminish undo-tree-mode
   :custom
@@ -831,7 +864,7 @@
   :custom (ruby-align-chained-calls t)
   :config
   (use-package smartparens-ruby)
-  (which-func-mode -1)
+  (which-function-mode -1)
   :hook
   (ruby-mode . subword-mode)
   (ruby-mode . lsp)
@@ -1094,9 +1127,7 @@
 
 ;; edit grep-buffers, e.g., ivy-occur
 (use-package wgrep
-  :commands wgrep-mode
-  :init (add-hook 'ivy-occur-grep-mode-hook
-	                (lambda () (toggle-truncate-lines 1)))
+  :straight t
   )
 
 (use-package ws-butler
@@ -1176,27 +1207,9 @@
 ;; (org-todo-keywords
 ;;    '((sequence "TODO(t)" "IN PROGRESS(p)" | "DONE(d!)")))
 
-(use-package org
-  :straight t
-  :mode ("\\.org\\'" . org-mode)
-  :custom
-  (org-export-backends '(ascii html md))
-  (org-directory "d:/work/notes")
-  (org-hide-emphasis-markers t)
-  :bind (("C-c c" . org-capture))
-  :config
-  (setq org-id-track-globally t)
-  (setq org-capture-templates
-        '(("t" "Todo [inbox]" entry
-           (file+headline "d:/work/notes/todo.org" "Tasks")
-           "* TODO %i%? %a")
-          ))
-  (setq org-todo-keywords
-   '((sequence "TODO(t)" "IN PROGRESS(p)" | "DONE(d!)")))
-  :hook (org-mode . visual-line-mode)
-  )
 
 (use-package org-mru-clock
+  :after org
   :straight t
   :bind* (("C-c C-x i" . org-mru-clock-in)
           ("C-c C-x C-j" . org-mru-clock-select-recent-task))
