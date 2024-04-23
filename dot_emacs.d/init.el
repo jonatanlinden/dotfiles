@@ -57,6 +57,7 @@
 (unless (file-exists-p jonatan-personal-dir)
   (make-directory jonatan-personal-dir))
 
+(setenv "GPG_AGENT_INFO" nil)
 (setq auth-sources
     '((:source "~/.emacs.d/.authinfo.gpg")))
 
@@ -270,8 +271,10 @@
   (org-export-backends '(ascii html md))
   (org-directory "d:/work/notes")
   (org-hide-emphasis-markers t)
+  (org-clock-persist t)
   :bind (("C-c c" . org-capture))
   :config
+  (org-clock-persistence-insinuate)
   ;; (setq org-capture-templates
   ;;       '(("t" "Todo [inbox]" entry
   ;;          (file+headline "d:/work/notes/todo.org" "Tasks")
@@ -329,6 +332,13 @@
     ;; needed for the server to start on Windows.
     (defun server-ensure-safe-dir (dir) "Noop" t)))
 
+(use-package project
+  :custom (project-switch-commands '((project-find-file "Find file" "f")
+                                     (project-find-dir "Find dir" "d")
+                                     (project-dired "Dired" "D")
+                                     (consult-ripgrep "ripgrep" "g")
+                                     (magit-project-status "Magit" "m"))))
+
 (use-package solarized-theme
   :if window-system
   :straight t
@@ -359,6 +369,7 @@
   :hook (after-init . mood-line-mode))
 
 (use-package which-func
+  :disabled t
   :config
   ;; Show the current function name in the header line, not in mode-line
   (setq-default header-line-format '(which-function-mode ("" which-func-format " ")))
@@ -683,19 +694,19 @@
 
 (use-package company
   :straight t
-  ;; :diminish (company-mode . "(c)")
-  :diminish company-mode
+  :diminish (company-mode . "(c)")
   :commands company-mode
   :custom (company-minimum-prefix-length 3)
   (company-global-modes '(not text-mode))
-  (company-idle-delay 0.2) ; decrease delay before autocompletion popup shows
   (company-dabbrev-downcase nil)
   (company-echo-delay 0) ; remove annoying blinking
     ;; set default company-backends
-  (company-backends
-        '((company-files
-           company-capf
-           company-yasnippet) company-dabbrev company-dabbrev-code))
+  ;; (company-backends
+  ;;       '((company-files
+  ;;          company-capf
+  ;;          company-yasnippet) company-dabbrev company-dabbrev-code))
+  :config
+  (setq lsp-completion-provider :capf)
   :bind
   (:map company-active-map
         ("C-e" . company-other-backend)
@@ -717,11 +728,8 @@
   :straight t
   :bind
   ("M-2" . er/expand-region)
-  ("H-§" . er/expand-region)
   ("s-0" . er/expand-region)
   ("C-," . er/mark-word)
-  :config
-  (unbind-key "M-@" global-map)
   )
 
 
@@ -811,7 +819,7 @@
 (use-package lsp-mode
   :straight t
   :custom
-  (lsp-headerline-breadcrumb-enable nil)
+  (lsp-headerline-breadcrumb-enable t)
   (lsp-prefer-flymake nil)
   ;;(lsp-auto-configure nil)
   :commands lsp
@@ -887,12 +895,52 @@
   :hook (ruby-mode . ruby-tools-mode)
   :diminish ruby-tools-mode)
 
+(defun gfm-markdown-filter (buffer)
+  "Configure a default layout for rendering markdown files."
+  (princ
+   (with-temp-buffer
+     (let ((tmp (buffer-name)))
+       (set-buffer buffer)
+       (set-buffer (markdown tmp))
+       (format "<!DOCTYPE html><html><title>Markdown preview</title><link rel=\"stylesheet\" href = \"https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.min.css\"/>
+<body><article class=\"markdown-body\" style=\"box-sizing: border-box;min-width: 200px;max-width: 980px;margin: 0 auto;padding: 45px;\">%s</article></body></html>" (buffer-string))))
+   (current-buffer)))
+
+(use-package impatient-mode
+  :straight t
+  :custom (imp-set-user-filter gfm-markdown-filter)
+  :commands impatient-mode
+  )
+
+(use-package simple-httpd
+  :straight t
+  :config
+  (setq httpd-port 7070)
+;; (setq httpd-host (system-name))
+  )
+
+
+
+(defun my-markdown-live-preview ()
+"Live preview markdown."
+(interactive)
+(unless (process-status "httpd")
+(httpd-start))
+(impatient-mode)
+(imp-set-user-filter 'my-markdown-filter
+(imp-visit-buffer)
+)
+)
 
 (use-package markdown-mode
   :straight t
   :custom (markdown-fontify-code-block-natively t)
-    :mode (("\\.md\\'" . gfm-mode)
-           ("\\.markdown\\'" . gfm-mode)))
+  (markdown-command "pandoc -t html5 -f gfm --embed-resources --standalone --mathjax --quiet --highlight-style=pygments --template github.html")
+  (markdown-live-preview-engine 'pandoc)
+  :mode (("\\.md\\'" . gfm-mode)
+         ("\\.markdown\\'" . gfm-mode))
+  :hook (my-markdown-live-preview)
+  )
 
 (use-package yaml-mode
   :straight t
@@ -1044,8 +1092,9 @@
   ([remap kill-sexp] . sp-kill-hybrid-sexp)
   (:map c++-mode-map
         ("C-c C-o" . ff-find-other-file))
-  :hook (c++-mode . jl/c++-mode-hook)
-  (lsp)
+  :hook
+  (c++-mode . jl/c++-mode-hook)
+  (c++-mode . lsp)
   )
 
 (use-package modern-cpp-font-lock
@@ -1211,10 +1260,12 @@
 (use-package org-mru-clock
   :after org
   :straight t
-  :bind* (("C-c C-x i" . org-mru-clock-in)
-          ("C-c C-x C-j" . org-mru-clock-select-recent-task))
-  :custom
-  (org-mru-clock-how-many 10))
+  :custom (org-mru-clock-how-many 10)
+  :bind* (("<f8>" . org-mru-clock-in))
+  :commands (org-mru-clock-in org-mru-clock-select-recent-task)
+  :config
+  (add-hook 'minibuffer-setup-hook #'org-mru-clock-embark-minibuffer-hook)
+  )
 
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 
@@ -1289,7 +1340,13 @@
          )
   :hook (magit-mode . magit-svn-mode))
 
+(use-package forge
+  :straight t
+  :after magit
+  )
+
 (use-package magit-delta
+  :disabled t
   :straight t
   :hook (magit-mode . magit-delta-mode))
 
@@ -1373,6 +1430,28 @@
   :hook (prog-mode . dumb-jump-mode)
   )
 
+(defun jl/comment-box (b e)
+"Draw a box comment around the region but arrange for the region
+ to extend to at least the fill column. Place the point after the
+ comment box."
+
+(interactive "r")
+
+(let ((e (copy-marker e t))
+      (fill-column (- fill-column 6))
+      )
+  (goto-char b)
+  (end-of-line)
+  (insert-char ?  (- fill-column (current-column)))
+  (comment-box b e 1)
+  (goto-char e)
+  (set-marker e nil)))
+
+(bind-key [remap comment-box] 'jl/comment-box)
+
+
+
+
 ;;; in bat mode, treat _ as a word constitutent
 (add-hook 'bat-mode-hook #'(lambda () (modify-syntax-entry ?_ "w")))
 
@@ -1408,6 +1487,11 @@
   :mode ("\\.ps1\\'")
   :custom (powershell-location-of-exe (executable-find "pwsh"))
   )
+
+(use-package python-mode
+  :ensure nil
+  :custom (python-shell-interpreter "python")
+)
 
 (use-package nxml-mode
   :mode ("\\.xml\\'")

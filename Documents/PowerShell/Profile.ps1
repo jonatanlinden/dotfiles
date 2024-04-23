@@ -11,26 +11,19 @@ Set-PSReadLineKeyHandler -Key Tab -Function Complete
 
 $Env:EDITOR="emacsclient"
 
-function reload_alias { & $PROFILE.CurrentUserAllHosts }
-Set-Alias -Name reload -Value reload_alias
+function which { param($bin) Get-Command $bin }
+
+function Invoke-Starship-PreCommand {
+    $Host.UI.RawUI.WindowTitle = $((''+$PWD).replace($HOME, '~'))
+
+    # get location from session (so that the pane can be restored)
+    $loc = $executionContext.SessionState.Path.CurrentLocation;
+    $prompt = "$([char]27)]9;12$([char]7)"
+    if ($loc.Provider.Name -eq "FileSystem")
+    {
+        $prompt += "$([char]27)]9;9;`"$($loc.ProviderPath)`"$([char]27)\"
+    }
+    $host.ui.Write($prompt)
+}
 
 Invoke-Expression (&starship init powershell)
-
-# capture starship prompt
-$PromptScript = (Get-Item function:Prompt).ScriptBlock
-
-# update window title and reuse starship prompt
-function Prompt {
-    $PreservedExitStatus = $? # Before doing anything else, capture current $?
-
-    $CurrentWorkingDirectory = Split-Path -Path ((Get-Location).Path.Replace($Env:USERNAME, "~")) -Leaf
-    $CurrentWorkingProcess = (Get-Process -Id $PID).ProcessName
-    $Host.UI.RawUI.WindowTitle = "$CurrentWorkingDirectory - $CurrentWorkingProcess" # Set Title
-
-    if ($? -ne $PreservedExitStatus) {
-        # Reset $? to False
-        Write-Error "" -ErrorAction Ignore # Powershell 7+
-        # Source: https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_automatic_variables?view=powershell-7.1#section-1
-    }
-    Invoke-Command $PromptScript
-}
