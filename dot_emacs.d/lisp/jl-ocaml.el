@@ -1,6 +1,6 @@
 ;; tuareg: Major mode for editing OCaml code
 (use-package tuareg
-  :straight t
+  :ensure t
   :mode (("\\.ml[ily]?$" . tuareg-mode)
          ("\\.topml$" . tuareg-mode))
   :init
@@ -20,7 +20,7 @@
 
 ;; merlin: Context sensitive completion for OCaml in Vim and Emacs
 (use-package merlin
-  :straight t
+  :ensure t
   :custom
   (merlin-completion-with-doc t)
   ;; Disable Merlin's own error checking
@@ -39,7 +39,8 @@
 
 ;; OCaml support for Flycheck using Merlin
 (use-package flycheck-ocaml
-  :straight t
+  :disabled t
+  :ensure t
   :hook (merlin-mode . ocaml-init-flycheck))
 
 ;; utop is an improved toplevel for OCaml. It can run in a terminal or in
@@ -47,7 +48,7 @@
 ;; completion, colors, and more.
   (use-package utop
     :defer t
-    :straight t
+    :ensure t
     :init
     (autoload 'utop-minor-mode "utop" "Minor mode for utop" t)
     (add-hook 'tuareg-mode-hook 'utop-minor-mode)
@@ -57,7 +58,7 @@
 
 ;; ocp-indent: Indentation tool for OCaml, to be used from editors like Emacs
 (use-package ocp-indent
-  :straight t
+  :ensure t
   :hook (tuareg-mode . ocp-setup-indent))
 
 (provide 'jl-ocaml)

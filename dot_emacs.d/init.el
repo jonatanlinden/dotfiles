@@ -8,6 +8,7 @@
 ;; (mapconcat (quote identity)
 ;;            (sort (font-family-list) #'string-lessp) "\n"))
 
+(setq debug-on-error t)
 (defvar *is-mac* (eq system-type 'darwin))
 (defvar *is-win* (eq system-type 'windows-nt))
 
@@ -196,75 +197,98 @@
 ;; smart tab behavior - indent or complete
 (setq tab-always-indent 'complete)
 
-;; It seems this setting has to be before bootstrapping straight, to avoid
-;; a "malformed cache"
-(setq straight-use-symlinks t
-      ;; No other configuration should be necessary to make this work;
-      ;; however, you may wish to call straight-prune-build occasionally,
-      ;; since otherwise this cache file may grow quite large over time.
-      straight-cache-autoloads t)
-;; (setq straight-use-package-by-default t)
-(defvar bootstrap-version)
-(let ((bootstrap-file
-       (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-       (bootstrap-version 5))
-   (unless (file-exists-p bootstrap-file)
-     (with-current-buffer
-         (url-retrieve-synchronously
-          "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
-          'silent 'inhibit-cookies)
-       (goto-char (point-max))
-       (eval-print-last-sexp)))
-   (load bootstrap-file nil 'nomessage))
+(defvar elpaca-installer-version 0.7)
+(defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+(defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
+(defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                              :ref nil :depth 1
+                              :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                              :build (:not elpaca--activate-package)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
+       (build (expand-file-name "elpaca/" elpaca-builds-directory))
+       (order (cdr elpaca-order))
+       (default-directory repo))
+  (add-to-list 'load-path (if (file-exists-p build) build repo))
+  (unless (file-exists-p repo)
+    (make-directory repo t)
+    (when (< emacs-major-version 28) (require 'subr-x))
+    (condition-case-unless-debug err
+        (if-let ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                 ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                 ,@(when-let ((depth (plist-get order :depth)))
+                                                     (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                 ,(plist-get order :repo) ,repo))))
+                 ((zerop (call-process "git" nil buffer t "checkout"
+                                       (or (plist-get order :ref) "--"))))
+                 (emacs (concat invocation-directory invocation-name))
+                 ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                       "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                 ((require 'elpaca))
+                 ((elpaca-generate-autoloads "elpaca" repo)))
+            (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+          (error "%s" (with-current-buffer buffer (buffer-string))))
+      ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+  (unless (require 'elpaca-autoloads nil t)
+    (require 'elpaca)
+    (elpaca-generate-autoloads "elpaca" repo)
+    (load "./elpaca-autoloads")))
+(add-hook 'after-init-hook #'elpaca-process-queues)
+(elpaca `(,@elpaca-order))
 
-(straight-use-package 'use-package)
+(elpaca elpaca-use-package
+  ;; Enable use-package :ensure support for Elpaca.
+  (elpaca-use-package-mode))
 
 (setq use-package-verbose t
       ;; use-package-compute-statistics t
       use-package-minimum-reported-time 0.05
       )
 
-(eval-when-compile
-  (require 'use-package))
+;(eval-when-compile
+;  (require 'use-package))
 
 (use-package diminish
-  :straight t)
+  :ensure (:wait t))
 
-(use-package bind-key
-  :straight t)
+(use-package general
+  :ensure (:wait t)
+  :config
+  (general-define-key
+   [remap delete-char] 'delete-forward-char
+  ;; Better than default - from /u/zck
+   "M-c" 'capitalize-dwim
+   "M-l" 'downcase-dwim
+   "M-u" 'upcase-dwim
+   "C-x O"  'other-window-prev
+   ;; use hippie-expand instead of dabbrev
+   "M-/" 'hippie-expand
+   "s-/" 'hippie-expand
+   ;; align code
+  "C-x \\" 'align-regexp
+   ;; mark-end-of-sentence is normally unassigned
+   "M-h" 'mark-end-of-sentence
+   ;; rebind to zap-up-to-char instead of zap-to-char
+   "M-z" 'zap-up-to-char
+   ;; switch between buffers fast
+   "<f1>" 'previous-buffer
+   "<f2>" 'next-buffer
+   [remap comment-box] 'jl/comment-box
+   )
 
-;; The command ‘delete-forward-char’ is preferable for interactive
-;; use, e.g.  because it respects values of ‘delete-active-region’ and
-;; ‘overwrite-mode’.
-(bind-key [remap delete-char] 'delete-forward-char)
-;; Better than default - from /u/zck
-(bind-key "M-c" 'capitalize-dwim)
-(bind-key "M-l" 'downcase-dwim)
-(bind-key "M-u" 'upcase-dwim)
+  (general-def prog-mode-map
+   "s-f" 'mark-defun
+   )
+  
 
-(bind-keys
- ("C-x O" . other-window-prev)
- ;; use hippie-expand instead of dabbrev
- ("M-/" . hippie-expand)
- ("s-/" . hippie-expand)
- ;; align code
- ("C-x \\" . align-regexp)
- ;; mark-end-of-sentence is normally unassigned
- ("M-h" . mark-end-of-sentence)
- ;; rebind to zap-up-to-char instead of zap-to-char
- ("M-z" . zap-up-to-char)
- ;; switch between buffers fast
- ("<f1>" . previous-buffer)
- ("<f2>" . next-buffer)
- )
+  ;;; open current file in explorer/finder
+  (when *is-win*
+    (general-define-key "M-O" #'jl/open-folder-in-explorer))
+  )
 
 
 
-
-(bind-key "s-f" 'mark-defun prog-mode-map)
-
-
-(use-package org :straight (:type built-in)
+(use-package org :ensure t
   :demand t
 
   :custom
@@ -287,13 +311,14 @@
 
 
 (use-package no-littering
-  :straight t
+  :ensure t
   :init
   (setq auto-save-file-name-transforms
         `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
         custom-file (no-littering-expand-etc-file-name "custom.el")))
 
-(load custom-file t)
+(add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
+
 
 ;; load the personal settings
 (when (file-exists-p jonatan-personal-dir)
@@ -312,10 +337,12 @@
 ;; manage elpa keys
 (use-package gnu-elpa-keyring-update
   :disabled t
-  :straight t)
+  :ensure t)
 
 (use-package page-break-lines
-  :straight t)
+  :ensure t)
+
+
 
 (use-package server
   :if *is-win*
@@ -341,7 +368,7 @@
 
 (use-package solarized-theme
   :if window-system
-  :straight t
+  :ensure t
   :custom
   (solarized-scale-org-headlines nil)
   (solarized-use-variable-pitch nil)
@@ -357,25 +384,16 @@
 
 (use-package color-theme-sanityinc-tomorrow
   :unless window-system
-  :straight t
+  :ensure t
   :init (load-theme 'sanityinc-tomorrow-night)
   )
 
 (use-package mood-line
-  :straight t
+  :ensure t
   :custom
   (mood-line-show-eol-style t)
   (mood-line-show-encoding-information t)
   :hook (after-init . mood-line-mode))
-
-(use-package which-func
-  :disabled t
-  :config
-  ;; Show the current function name in the header line, not in mode-line
-  (setq-default header-line-format '(which-function-mode ("" which-func-format " ")))
-  (setq mode-line-misc-info
-        (assq-delete-all 'which-function-mode mode-line-misc-info))
-  :hook (prog-mode . which-function-mode))
 
 (use-package paren
   :hook (after-init . show-paren-mode)
@@ -386,7 +404,7 @@
 ;; note: in macos, disable shortcuts for mission control to make
 ;; <c-left> and <c-right> to work correctly
 (use-package smartparens
-  :straight t
+  :ensure t
   :hook ((lisp-mode emacs-lisp-mode) . smartparens-strict-mode)
   :custom
   (sp-base-key-bindings 'paredit)
@@ -442,7 +460,7 @@
   :hook (after-init . recentf-mode))
 
 (use-package crux
-  :straight t
+  :ensure t
   :bind (("C-c o" . crux-open-with)
          ("C-c n" . crux-cleanup-buffer-or-region)
          ;;("C-c f" . crux-recentf-find-file)
@@ -467,17 +485,17 @@
 
 
 (use-package rainbow-delimiters
-  :straight t
+  :ensure t
   :hook (prog-mode . rainbow-delimiters-mode))
 
 (use-package highlight-parentheses
-  :straight t
+  :ensure t
   :diminish highlight-parentheses-mode
   :init (setq hl-paren-highlight-adjacent t)
   :hook ((after-init . global-highlight-parentheses-mode)))
 
 (use-package anzu
-  :straight t
+  :ensure t
   :bind
   ([remap query-replace] . anzu-query-replace)
   ([remap query-replace-regexp] . anzu-query-replace-regexp)
@@ -489,7 +507,7 @@
   (after-init . global-anzu-mode))
 
 (use-package avy
-  :straight t
+  :ensure t
   :custom
   (avy-style 'de-bruijn)
   (avy-background t)
@@ -504,13 +522,13 @@
   )
 
 (use-package avy-zap
-  :straight t
+  :ensure t
   :bind
   ("M-z" . avy-zap-to-char-dwim)
   ("M-z" . avy-zap-up-to-char-dwim))
 
 (use-package amx
-  :straight t
+  :ensure t
   :bind (("<remap> <execute-extended-command>" . amx)))
 
 
@@ -519,22 +537,22 @@
   :hook (after-init . save-place-mode))
 
 (use-package vertico
-  :straight t
+  :ensure t
   :init
   (vertico-mode +1))
 
 (use-package orderless
-  :straight t
+  :ensure t
   :custom
   (completion-styles '(orderless basic))
   (completion-category-overrides '((file (styles basic partial-completion)))))
 
 (use-package marginalia
-  :straight t
+  :ensure t
   :config (marginalia-mode))
 
 (use-package consult
-  :straight t
+  :ensure t
   :bind
   (("M-y" . consult-yank-from-kill-ring)
    ("C-x b" . consult-buffer)
@@ -556,7 +574,7 @@
 ;;(setq read-file-name-completion-ignore-case t)
 
 (use-package embark
-  :straight t
+  :ensure t
   :bind
   (("C-." . embark-act)         ;; pick some comfortable binding
    ("C-;" . embark-dwim)        ;; good alternative: M-.
@@ -575,7 +593,7 @@
 
   ;; Consult users will also want the embark-consult package.
   (use-package embark-consult
-    :straight t
+    :ensure t
     :after (embark consult)
     :demand t ; only necessary if you have the hook below
     ;; if you want to have consult previews as you move around an
@@ -583,83 +601,19 @@
     :hook
     (embark-collect-mode . consult-preview-at-point-mode))
 
-(use-package ivy
-  :disabled t
-  :straight t
-  :diminish
-
-  :custom
-  (ivy-extra-directories nil)
-  (ivy-use-virtual-buffers t)
-  (ivy-virtual-abbreviate 'abbreviate)
-  (ivy-count-format "(%d/%d) ")
-  (ivy-initial-inputs-alist nil)
-  :hook
-  (after-init . ivy-mode)
-  (ivy-mode . counsel-mode)
-  :bind
-  ("s-b" . ivy-switch-buffer)
-  ("H-b" . ivy-switch-buffer)
-  ("C-c C-r" . 'ivy-resume)
-  (:map ivy-switch-buffer-map
-        ("H-k" . ivy-switch-buffer-kill)))
 
 (use-package ace-window
-  :straight t
+  :ensure t
   :bind
   (("s-w" . ace-window)
    ;([remap other-window] . ace-window))
    ))
 
-(use-package swiper
-  :disabled t
-  :straight t
-  :custom
-  (swiper-action-recenter t))
-
-(use-package counsel
-  :disabled t
-  :straight t
-  :diminish counsel-mode ivy-mode
-  :custom
-  (counsel-find-file-at-point t)
-  (counsel-grep-base-command
-   "rg -i -M 120 --no-heading --line-number --color never %s %s")
-  (counsel-grep-swiper-limit 30000)
-  (counsel-async-command-delay 0.5)
-  :config
-  (if *is-win*
-      (setq counsel-git-log-cmd "set GIT_PAGER=cat && git log --grep \"%s\""))
-  :bind
-  (("M-x" . counsel-M-x)
-   ("C-x C-m" . counsel-M-x)
-   ("C-x C-f" . counsel-find-file)
-   ("<f1> f" . counsel-describe-function)
-   ("<f1> v" . counsel-describe-variable)
-   ("<f1> l" . counsel-find-library)
-   ;;("C-c g" . counsel-git)
-   ("C-c j" . counsel-git-grep)
-   ("C-c r" . counsel-rg)
-   ("C-x l" . counsel-locate)
-   ("s-r" . counsel-recentf)
-   ([remap isearch-forward]  . swiper-isearch)
-   ([remap isearch-backward] . counsel-grep-or-swiper)
-   :map minibuffer-local-map
-   ("C-r" . counsel-minibuffer-history)
-   :map counsel-find-file-map
-   ("C-w" . counsel-up-directory)))
-
-
-(use-package ivy-prescient
-  :disabled t
-  :after counsel
-  :straight t
-  :hook (after-init . ivy-prescient-mode))
 
 ;; temporarily highlight changes from yanking, etc
 (use-package volatile-highlights
   :diminish
-  :straight t
+  :ensure t
   :hook
   (after-init . volatile-highlights-mode)
   )
@@ -672,9 +626,10 @@
   (dired-recursive-copies 'always)
   (dired-create-destination-dirs t)
   (dired-dwim-target t))
-
-(use-package dired-plus
-  :straight t
+;; https://github.com/emacsmirror/dired-plus
+(use-package dired+
+  :disabled t
+  :ensure (dired-plus :type git :host github repo: "emacsmirror/dired-plus")
   :after dired
   :bind
   (:map dired-mode-map
@@ -693,7 +648,7 @@
   )
 
 (use-package company
-  :straight t
+  :ensure t
   :diminish (company-mode . "(c)")
   :commands company-mode
   :custom (company-minimum-prefix-length 3)
@@ -718,14 +673,14 @@
 
 (use-package company-prescient
   :after (prescient company)
-  :straight t
+  :ensure t
   :hook (company-mode . company-prescient-mode))
 
 
 ;(use-package expand-region
 ;  :bind* ("C-," . er/expand-region))
 (use-package expand-region
-  :straight t
+  :ensure t
   :bind
   ("M-2" . er/expand-region)
   ("s-0" . er/expand-region)
@@ -734,17 +689,15 @@
 
 
 (use-package change-inner
-  :straight t
+  :ensure t
   :bind
   ("M-i" . change-inner)
   ;("M-o" . change-outer)
   :config
   (advice-add 'change-inner* :around #'delete-region-instead-of-kill-region))
 
-
-
 (use-package symbol-overlay
-  :straight t
+  :ensure t
   :diminish symbol-overlay-mode
   :custom
   (symbol-overlay-idle-time 1.5)
@@ -757,18 +710,18 @@
 
 ;; show available keybindings after you start typing
 (use-package which-key
-  :straight t
+  :ensure t
   :diminish which-key-mode
   :hook (after-init . which-key-mode)
   )
 
 (use-package discover-my-major
-  :straight t
+  :ensure t
   :commands (discover-my-major discover-my-mode)
   )
 
 (use-package vundo
-  :straight t
+  :ensure t
   :custom
   (vundo-glyph-alist vundo-unicode-symbols)
   (vundo-roll-back-on-quit nil)
@@ -776,36 +729,16 @@
          )
   )
 
-(use-package undo-tree
-  :disabled t
-  :straight t
-  :diminish undo-tree-mode
-  :custom
-  (undo-tree-enable-undo-in-region t)
-  ;; do not autosave the undo-tree history
-  (undo-tree-auto-save-history nil)
-  (undo-tree-history-directory-alist
-   `((".*" . ,temporary-file-directory)))
-  :bind
-  (("C-z" . 'undo)
-   ("C-S-z" . 'undo-tree-redo))
-  :hook (after-init . global-undo-tree-mode))
-
 (use-package find-file-in-project
-  :straight t
+  :ensure t
   :custom (ffip-use-rust-fd t)
   :bind (("s-f" . find-file-in-project)
          ("s-F". find-file-in-current-directory)
          ("M-s-f" . find-file-in-project-by-selected)))
 
-(use-package counsel-fd
-  :disabled t
-  :straight t
-  :after counsel
-  :commands (counsel-fd-dired-jump counsel-fd-file-jump))
 
 (use-package flycheck
-  :straight t
+  :ensure t
   :custom
   (flycheck-checker-error-threshold 1605)
   (flycheck-check-syntax-automatically '(save))
@@ -817,7 +750,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LANGUAGES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (use-package lsp-mode
-  :straight t
+  :ensure t
   :custom
   (lsp-headerline-breadcrumb-enable t)
   (lsp-prefer-flymake nil)
@@ -831,7 +764,7 @@
 ;; https://github.com/emacs-lsp/lsp-ui
 (use-package lsp-ui
   :disabled t
-  :straight t
+  :ensure t
   :custom
   (lsp-ui-sideline-enable nil)
   (lsp-ui-doc-enable nil)
@@ -845,7 +778,7 @@
   )
 
 (use-package flycheck-clang-tidy
-  :straight t
+  :ensure t
   :if (executable-find "clang-tidy")
   :custom (flycheck-clang-tidy-build-path "../../build")
   :after (flycheck)
@@ -853,21 +786,59 @@
   )
 
 (use-package groovy-mode
-  :straight t
+  :ensure t
   :custom (groovy-indent-offset 2)
   :mode ("Jenkinsfile" "\\.groovy\\'" )
   )
 
 (use-package inf-ruby
   :after ruby-mode
-  :straight t
+  :ensure t
   :config
   ; (add-to-list 'inf-ruby-implementations '("ruby" . "irb --prompt default --noreadline -r irb/completion"))
   (setq inf-ruby-default-implementation "ruby")
   :hook (ruby-mode . inf-ruby-minor-mode))
 
+(defun treesit-install-all-grammars () (interactive)
+       (dolist (lang treesit-language-source-alist)
+         (unless (treesit-language-available-p (car lang))
+           (treesit-install-language-grammar (car lang)))))
+
+(use-package treesit
+  :ensure nil
+  :init
+  (setq treesit-language-source-alist
+        '((javascript . ("git@github.com:tree-sitter/tree-sitter-javascript.git"))
+          (json . ("git@github.com:tree-sitter/tree-sitter-json.git"))
+          (ruby . ("git@github.com:tree-sitter/tree-sitter-ruby.git"))
+          (yaml . ("https://github.com/ikatyang/tree-sitter-yaml"))))
+  :config
+  (treesit-install-all-grammars)
+  (setq major-mode-remap-alist
+        '((yaml-mode . yaml-ts-mode)
+          (css-mode . css-ts-mode)
+          (typescript-mode . typescript-ts-mode)
+          (dockerfile-mode . dockerfile-ts-mode)
+          (javascript-mode . js-ts-mode)
+          (json-mode . json-ts-mode)
+          (ruby-mode . ruby-ts-mode)
+          (html-mode . html-ts-mode))))
+
+(use-package eglot
+  :init
+  (fset #'jsonrpc--log-event #'ignore) ;; performance boost
+  :hook
+  (typescript-ts-mode . eglot-ensure)
+  (js-ts-mode . eglot-ensure)
+  (ruby-ts-mode . eglot-ensure)
+  (json-ts-mode . eglot-ensure)
+  (yaml-ts-mode . eglot-ensure)
+  (dockerfile-ts-mode . eglot-ensure)
+  (css-mode . eglot-ensure)
+  (html-mode . eglot-ensure))
+
 (use-package ruby-mode
-  :straight t
+  :ensure nil
   :mode ("Rakefile" "\\.rb\\'")
   :custom (ruby-align-chained-calls t)
   :config
@@ -884,13 +855,13 @@
   )
 
 (use-package yard-mode
-  :straight t
+  :ensure t
   :diminish yard-mode
   :after ruby-mode
   :hook ruby-mode)
 
 (use-package ruby-tools
-  :straight t
+  :ensure t
   :commands ruby-tools-mode
   :hook (ruby-mode . ruby-tools-mode)
   :diminish ruby-tools-mode)
@@ -907,15 +878,15 @@
    (current-buffer)))
 
 (use-package impatient-mode
-  :straight t
+  :ensure t
   :custom (imp-set-user-filter gfm-markdown-filter)
   :commands impatient-mode
   )
 
 (use-package simple-httpd
-  :straight t
-  :config
-  (setq httpd-port 7070)
+  :ensure t
+  :custom
+  (httpd-port 7070)
 ;; (setq httpd-host (system-name))
   )
 
@@ -933,7 +904,7 @@
 )
 
 (use-package markdown-mode
-  :straight t
+  :ensure t
   :custom (markdown-fontify-code-block-natively t)
   (markdown-command "pandoc -t html5 -f gfm --embed-resources --standalone --mathjax --quiet --highlight-style=pygments --template github.html")
   (markdown-live-preview-engine 'pandoc)
@@ -943,7 +914,7 @@
   )
 
 (use-package yaml-mode
-  :straight t
+  :ensure t
   :mode ("\\.yaml\\'" "\\.yml\\'"))
 
 (use-package css-mode
@@ -952,7 +923,7 @@
   )
 
 (use-package com-css-sort
-  :straight t
+  :ensure t
   :after css-mode
   :custom (com-css-sort-sort-type 'alphabetic-sort)
   :bind (:map css-mode-map
@@ -966,7 +937,7 @@
   )
 
 (use-package web-mode
-  :straight t
+  :ensure t
   :custom (web-mode-css-indent-offset 2)
   :config
   (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
@@ -976,21 +947,17 @@
   (setq web-mode-enable-auto-closing t)
   (setq web-mode-tag-auto-close-style 2)
   (setq web-mode-enable-auto-quoting t)
-  (use-package web-mode-edit-element :straight t)
+  (use-package web-mode-edit-element :ensure t)
   :hook (web-mode . jl/web-mode-hook))
 
 ;; TODO: Evaluate, use local binaries from, e.g., yarn, npm
 (use-package find-local-executable
-  :disabled t
-  )
-
-
-(use-package json-mode
+  :ensure nil
   :disabled t
   )
 
 (use-package jsonian
-  :straight t
+  :ensure t
   :after so-long
   :custom
   (jsonian-no-so-long-mode)
@@ -999,7 +966,7 @@
 
 ;; Show changes in fringe
 (use-package diff-hl
-  :straight t
+  :ensure t
   :bind (("C-c g n" . diff-hl-next-hunk)
          ("C-c g p" . diff-hl-previous-hunk))
   :config (unless (display-graphic-p) (diff-hl-margin-mode))
@@ -1011,10 +978,11 @@
          (magit-post-refresh . diff-hl-magit-post-refresh)))
 
 (use-package hl-todo
-  :straight t
+  :ensure t
   :hook ((after-init . global-hl-todo-mode)))
 
 (use-package whitespace
+  :ensure nil
   :commands (whitespace-mode)
   :init (setq whitespace-line-column 80))
 ;  :hook (asm-mode . whitespace-mode)
@@ -1043,11 +1011,11 @@
       ;;  ))
 
 (use-package string-inflection
-  :straight t
+  :ensure t
   )
 
 (use-package arm-mode
-  :straight (arm-mode :type git :host github :repo "charJe/arm-mode"
+  :ensure (arm-mode :type git :host github :repo "charJe/arm-mode"
                       :fork (:host github
                                    :repo "jonatanlinden/arm-mode"))
   ;;:load-path "lisp/arm-mode"
@@ -1075,6 +1043,7 @@
 ;; (setq sp-escape-quotes-after-insert nil)
 
 (use-package cc-mode
+  :ensure nil
   :defer t
   :bind* (:map c-mode-base-map
                ("C-c C-o" . ff-find-other-file))
@@ -1083,10 +1052,12 @@
         c-basic-offset 2))
 
 (use-package sqlite-mode
+  :ensure nil
   :mode "\\.db\\'"
   )
 
 (use-package c++-mode
+  :ensure nil
   :after smartparens
   :bind
   ([remap kill-sexp] . sp-kill-hybrid-sexp)
@@ -1099,19 +1070,16 @@
 
 (use-package modern-cpp-font-lock
   :after c++-mode
-  :straight t)
+  :ensure t)
 
 
 (use-package mark-thing-at
-  :straight t
+  :ensure t
   :hook (after-init . mark-thing-at-mode))
 
-;;; open current file in explorer/finder
-(when *is-win*
-  (bind-key "M-O" #'jl/open-folder-in-explorer))
 
 (use-package reveal-in-osx-finder
-  :straight t
+  :ensure t
   :if *is-mac*
   :bind ("M-o" . reveal-in-osx-finder))
 
@@ -1123,13 +1091,14 @@
 
 
 (use-package clang-format
-  :straight t
+  :ensure t
   :after cc-mode
   :commands (clang-format-buffer clang-format-defun)
   :bind* (:map c++-mode-map
                ("C-c f" . clang-format-region)))
 
 (use-package ibuffer
+  :ensure nil
   :bind ("C-x C-b" . ibuffer)
   :config (setq ibuffer-saved-filter-groups
                 '(("Default"
@@ -1159,28 +1128,28 @@
   )
 
 (use-package ibuffer-vc
-  :straight t
+  :ensure t
   )
 
 ;; show the cursor when moving after big movements in the window
 (use-package beacon
-  :straight t
+  :ensure t
   :diminish beacon-mode
   :hook (after-init . beacon-mode))
 
 (use-package move-text
-  :straight t
+  :ensure t
   :bind
   (("M-<up>"    . move-text-up)
    ("M-<down>"  . move-text-down)))
 
 ;; edit grep-buffers, e.g., ivy-occur
 (use-package wgrep
-  :straight t
+  :ensure t
   )
 
 (use-package ws-butler
-  :straight t
+  :ensure t
   :custom
   (ws-butler-keep-whitespace-before-point nil)
   :diminish ""
@@ -1195,6 +1164,7 @@
   )
 
 (use-package lisp-mode
+  :ensure nil
   :diminish "L"
 :bind
   (:map emacs-lisp-mode-map
@@ -1206,7 +1176,7 @@
   )
 
 (use-package request
-  :straight t
+  :ensure t
   :defer t
   :custom
   (request-curl (if *is-win*  "c:/ProgramData/chocolatey/bin/curl.exe" "curl"))
@@ -1218,10 +1188,10 @@
   :diminish eldoc-mode)
 
 ;;(use-package yasnippet-snippets
-;;  :straight t)
+;;  :ensure t)
 
 (use-package yasnippet
-  :straight t
+  :ensure t
   :diminish yas-minor-mode
   :commands (yas-minor-mode)
   :hook
@@ -1234,7 +1204,7 @@
 
 
 (use-package arm-lookup
-  :straight (arm-lookup :type git :host github :repo "jonatanlinden/arm-lookup")
+  :ensure (arm-lookup :type git :host github :repo "jonatanlinden/arm-lookup")
   :after arm-mode
   :custom
   (arm-lookup-browse-pdf-function 'arm-lookup-browse-pdf-sumatrapdf)
@@ -1259,7 +1229,7 @@
 
 (use-package org-mru-clock
   :after org
-  :straight t
+  :ensure t
   :custom (org-mru-clock-how-many 10)
   :bind* (("<f8>" . org-mru-clock-in))
   :commands (org-mru-clock-in org-mru-clock-select-recent-task)
@@ -1271,14 +1241,14 @@
 
 (use-package ox-pandoc
   :disabled t
-  :straight t
+  :ensure t
   :after ox
   )
 
 (csetq ffap-machine-p-known 'reject)
 
 (use-package mediawiki
-  :straight t
+  :ensure t
   :commands (mediawiki-mode)
   :init
   ;; workaround, unable to run mediawiki-open otherwise
@@ -1288,39 +1258,39 @@
 
 (use-package alert
   :if window-system
-  :straight t
+  :ensure t
   :commands (alert)
   :custom (alert-default-style 'mode-line)
   )
 
 (use-package cmake-mode
-  :straight (:host github :repo "emacsmirror/cmake-mode" :files (:defaults "*"))
+  :ensure (:host github :repo "emacsmirror/cmake-mode" :files (:defaults "*"))
   :config
   (make-local-variable 'company-backends)
   (push 'company-cmake company-backends)
   :mode "CMakeLists.txt")
 
 (use-package toml-mode
-  :straight t
+  :ensure t
   :mode ("\\.toml\\'")
   )
 
 (use-package rust-mode
-  :straight t
+  :ensure t
   :hook (rust-mode . lsp))
 
 ;; Add keybindings for interacting with Cargo
 (use-package cargo
-  :straight t
+  :ensure t
   :hook (rust-mode . cargo-minor-mode))
 
 (use-package flycheck-rust
   :after rust
-  :straight t
+  :ensure t
   :hook (flycheck-mode . flycheck-rust-setup))
 
 (use-package multiple-cursors
-  :straight t
+  :ensure t
   :bind (("C-c m c" . mc/edit-lines)
          ("C->" . mc/mark-next-like-this-symbol)
          ("C-<" . mc/mark-previous-like-this-symbol)
@@ -1331,9 +1301,11 @@
   (setq fill-column 72)
   (turn-on-auto-fill))
 
+(use-package transient :ensure t)
 
 (use-package magit
-  :straight t
+  :after transient
+  :ensure t
   :custom (magit-section-initial-visibility-alist '((stashes . hide) (untracked . hide)))
   :bind (("C-x g" . magit-status)
          ("C-c g l" . magit-list-repositories)
@@ -1341,13 +1313,13 @@
   :hook (magit-mode . magit-svn-mode))
 
 (use-package forge
-  :straight t
+  :ensure t
   :after magit
   )
 
 (use-package magit-delta
   :disabled t
-  :straight t
+  :ensure t
   :hook (magit-mode . magit-delta-mode))
 
 ;; Transient commands: replaces the old magit-popup
@@ -1357,7 +1329,7 @@
 ;; git-messenger: popup commit message at current line
 ;; https://github.com/syohex/emacs-git-messenger
 (use-package git-messenger
-  :straight t
+  :ensure t
   :custom (git-messenger:use-magit-popup t)
   :bind
   (("C-c g m" . git-messenger:popup-message)
@@ -1368,7 +1340,7 @@
   (setq git-messenger:show-detail t))
 
 (use-package magit-svn
-  :straight t
+  :ensure t
   :diminish magit-svn-mode
   :commands (magit-svn-mode)
   )
@@ -1384,7 +1356,7 @@
 
 
 (use-package esup
-  :straight t
+  :ensure t
   :init
   (setq esup-depth 0)
   :commands esup
@@ -1417,7 +1389,7 @@
   )
 
 (use-package dumb-jump
-  :straight t
+  :ensure t
   :custom
   (dumb-jump-selector 'ivy)
   :config
@@ -1447,7 +1419,6 @@
   (goto-char e)
   (set-marker e nil)))
 
-(bind-key [remap comment-box] 'jl/comment-box)
 
 
 
@@ -1458,14 +1429,14 @@
 (windmove-default-keybindings 'control)
 ;; numbered window shortcuts
 (use-package winum
-  :straight t
+  :ensure t
   :defer t
   :config
   (winum-mode))
 
 (use-package posframe
   :after xref-posframe
-  :straight t)
+  :ensure t)
 
 (use-package xref-posframe
   :after xref-asm
@@ -1478,20 +1449,15 @@
   (xref-asm-activate))
 
 (use-package cheatsheet
-  :straight t
+  :ensure (:wait t)
   :commands (cheatsheet-show)
   )
 
 (use-package powershell
-  :straight t
+  :ensure t
   :mode ("\\.ps1\\'")
   :custom (powershell-location-of-exe (executable-find "pwsh"))
   )
-
-(use-package python-mode
-  :ensure nil
-  :custom (python-shell-interpreter "python")
-)
 
 (use-package nxml-mode
   :mode ("\\.xml\\'")
@@ -1499,7 +1465,7 @@
 
 (use-package point-history
   :disabled t
-  :straight (point-history :type git :host github :repo "blue0513/point-history")
+  :ensure (point-history :type git :host github :repo "blue0513/point-history")
   :hook after-init
   :bind (("C-c C-/" . point-history-show))
   :init (setq point-history-ignore-buffer "^ \\*Minibuf\\|^ \\*point-history-show*"))
@@ -1509,7 +1475,7 @@
   )
 
 (use-package go-mode
-  :straight t
+  :ensure t
   :bind (
          ;; If you want to switch existing go-mode bindings to use lsp-mode/gopls instead
          ;; uncomment the following lines
@@ -1519,12 +1485,12 @@
   :hook ((go-mode . lsp-deferred)))
 
 (use-package csv-mode
-  :straight t
+  :ensure t
   :mode ("\\.csv\\'")
   :hook (csv-mode . csv-guess-set-separator))
 
 (use-package js2-mode
-  :straight t
+  :ensure t
   :mode("\\.js\\'")
   :custom (js2-basic-offset 2)
   )

@@ -53,6 +53,15 @@
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
 
+
+;; Early no-littering
+;(when (and (fboundp 'startup-redirect-eln-cache)
+;           (boundp 'native-comp-eln-load-path))
+;  (startup-redirect-eln-cache
+;   (convert-standard-filename
+;    (expand-file-name  "var/eln-cache/" user-emacs-directory))))
+
+
 (cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
       (*is-linux* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
       (*is-mac* (add-to-list 'default-frame-alist '(font . "SF Mono-13")))
