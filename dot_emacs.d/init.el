@@ -26,9 +26,6 @@
   (add-to-list 'default-frame-alist '(ns-appearance . light))
   (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t)))
 
-;; Avoid eager loading of packages dependent on ...
-(setq initial-major-mode 'fundamental-mode)
-
 ;; TRY: check if this prevents freezing during command evaluation
 (defun jl/minibuffer-setup-hook ()
   (setq gc-cons-threshold most-positive-fixnum))
@@ -131,8 +128,6 @@
 ;; disable the annoying bell ring
 (setq ring-bell-function 'ignore)
 
-;; disable startup screen
-(setq inhibit-startup-screen t)
 
 ;; Time-stamp: <> in the first 8 lines?
 (add-hook 'before-save-hook 'time-stamp)
@@ -149,9 +144,6 @@
 
 ;; enable y/n answers
 (setq-default use-short-answers t)
-
-;; show trailing whitespace in editor
-;;(setq-default show-trailing-whitespace t)
 
 ;; more useful frame title, that show either a file or a
 ;; buffer name (if the buffer isn't visiting a file)
@@ -235,6 +227,7 @@
     (load "./elpaca-autoloads")))
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
+(setq elpaca-queue-limit 20)
 
 (elpaca elpaca-use-package
   ;; Enable use-package :ensure support for Elpaca.
@@ -244,9 +237,6 @@
       ;; use-package-compute-statistics t
       use-package-minimum-reported-time 0.05
       )
-
-;(eval-when-compile
-;  (require 'use-package))
 
 (use-package diminish
   :ensure (:wait t))
@@ -279,7 +269,7 @@
   (general-def prog-mode-map
    "s-f" 'mark-defun
    )
-  
+
 
   ;;; open current file in explorer/finder
   (when *is-win*
@@ -289,24 +279,31 @@
 
 
 (use-package org :ensure t
-  :demand t
-
   :custom
+  (org-table-duration-custom-format 'hours)
   (org-export-backends '(ascii html md))
-  (org-directory "d:/work/notes")
+  (org-directory "c:/work/notes")
   (org-hide-emphasis-markers t)
   (org-clock-persist t)
+  (org-duration-format (quote h:mm))
   :bind (("C-c c" . org-capture))
   :config
   (org-clock-persistence-insinuate)
-  ;; (setq org-capture-templates
-  ;;       '(("t" "Todo [inbox]" entry
-  ;;          (file+headline "d:/work/notes/todo.org" "Tasks")
-  ;;          "* TODO %i%? %a")
-  ;;         ))
-  ;; (setq org-todo-keywords
-  ;;       '((sequence "TODO(t)" "IN PROGRESS(p)" | "DONE(d!)")))
+  (setq org-duration-format '(("h" . t) (special . 2)))
+  (setq org-default-notes-file (concat org-directory "/notes.org"))
   :hook org-mode . (lambda () (electric-indent-mode -1))
+  )
+
+(use-package denote
+  :ensure t
+  :custom (denote-file-type 'markdown-yaml)
+  :bind
+  (("C-c n n" . denote)
+   ("C-c n l" . denote-link-or-create)
+   ("C-c n r" . denote-rename-file))
+  :config
+
+  (denote-rename-buffer-mode 1)
   )
 
 
@@ -349,9 +346,9 @@
   :init
   (server-mode 1)
   :hook (after-init . (lambda ()
-            (require 'server)
-            (unless (server-running-p)
-              (server-start)))))
+                        (require 'server)
+                        (unless (server-running-p)
+                          (server-start)))))
 
 (with-eval-after-load 'server
   (when (equal window-system 'w32)
@@ -462,7 +459,7 @@
 (use-package crux
   :ensure t
   :bind (("C-c o" . crux-open-with)
-         ("C-c n" . crux-cleanup-buffer-or-region)
+         ;;("C-c n" . crux-cleanup-buffer-or-region)
          ;;("C-c f" . crux-recentf-find-file)
          ("C-M-z" . crux-indent-defun)
          ("C-c u" . crux-view-url)
@@ -528,6 +525,7 @@
   ("M-z" . avy-zap-up-to-char-dwim))
 
 (use-package amx
+  :disabled t
   :ensure t
   :bind (("<remap> <execute-extended-command>" . amx)))
 
@@ -538,8 +536,9 @@
 
 (use-package vertico
   :ensure t
-  :init
-  (vertico-mode +1))
+  :hook
+  (after-init . vertico-mode)
+)
 
 (use-package orderless
   :ensure t
@@ -825,12 +824,10 @@
           (html-mode . html-ts-mode))))
 
 (use-package eglot
-  :init
-  (fset #'jsonrpc--log-event #'ignore) ;; performance boost
   :hook
   (typescript-ts-mode . eglot-ensure)
   (js-ts-mode . eglot-ensure)
-  (ruby-ts-mode . eglot-ensure)
+  (ruby-ts-mode . lsp)
   (json-ts-mode . eglot-ensure)
   (yaml-ts-mode . eglot-ensure)
   (dockerfile-ts-mode . eglot-ensure)
@@ -843,7 +840,6 @@
   :custom (ruby-align-chained-calls t)
   :config
   (use-package smartparens-ruby)
-  (which-function-mode -1)
   :hook
   (ruby-mode . subword-mode)
   (ruby-mode . lsp)
@@ -908,6 +904,7 @@
   :custom (markdown-fontify-code-block-natively t)
   (markdown-command "pandoc -t html5 -f gfm --embed-resources --standalone --mathjax --quiet --highlight-style=pygments --template github.html")
   (markdown-live-preview-engine 'pandoc)
+  (markdown-header-scaling t)
   :mode (("\\.md\\'" . gfm-mode)
          ("\\.markdown\\'" . gfm-mode))
   :hook (my-markdown-live-preview)
@@ -999,7 +996,7 @@
 
 (use-package asm-mode
   :custom (tab-width 8)
-  ;;:config (setq asm-comment-char ?#)
+  ;:config (setq asm-comment-char ?#)
 )
 
 ;; you can use `comment-dwim' (M-;) for this kind of behaviour anyway
@@ -1020,6 +1017,7 @@
                                    :repo "jonatanlinden/arm-mode"))
   ;;:load-path "lisp/arm-mode"
   :mode ("\\.i\\'" "\\.s\\'")
+  :config (setq asm-comment-char ?\;)
   :bind (:map arm-mode-map
               ("M-." . xref-posframe-dwim)
               ("M-," . xref-posframe-pop)))
@@ -1310,7 +1308,9 @@
   :bind (("C-x g" . magit-status)
          ("C-c g l" . magit-list-repositories)
          )
-  :hook (magit-mode . magit-svn-mode))
+  :hook (magit-mode . magit-svn-mode)
+)
+
 
 (use-package forge
   :ensure t

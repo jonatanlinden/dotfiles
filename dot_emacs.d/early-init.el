@@ -53,6 +53,24 @@
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
 
+;; Disable bidirectional text scanning for a modest performance boost.
+(setq-default bidi-display-reordering 'left-to-right
+              bidi-paragraph-direction 'left-to-right)
+
+;; Give up some bidirectional functionality for slightly faster re-display.
+(setq bidi-inhibit-bpa t)
+
+;; Remove "For information about GNU Emacs..." message at startup
+(advice-add #'display-startup-echo-area-message :override #'ignore)
+
+
+(setq inhibit-startup-screen t)
+;; do not even initialize it
+(advice-add #'display-startup-screen :override #'ignore)
+
+;; Avoid eager loading of packages dependent on ...
+(setq initial-major-mode 'fundamental-mode)
+
 
 ;; Early no-littering
 ;(when (and (fboundp 'startup-redirect-eln-cache)
@@ -61,6 +79,10 @@
 ;   (convert-standard-filename
 ;    (expand-file-name  "var/eln-cache/" user-emacs-directory))))
 
+
+(set-face-font 'default "Cascadia Code 10")
+(copy-face 'default 'fixed-pitch)
+(set-face-font 'variable-pitch "Segoe UI Semibold-10")
 
 (cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
       (*is-linux* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
