@@ -2,13 +2,13 @@
 
 ;; reduce the frequency of garbage collection by making it happen on
 ;; each 50MB of allocated data (the default is on every 0.76MB)
-(setq gc-cons-threshold (* 128 1024 1024))
+(setopt gc-cons-threshold (* 128 1024 1024))
 
 (message "Starting emacs %s" (current-time-string))
 
 (defun jl/reset-gc-threshold ()
   "Reset `gc-cons-threshold' to its default value."
-  (setq gc-cons-threshold (* 16 1024 1024)))
+  (setopt gc-cons-threshold (* 16 1024 1024)))
 
 ;; reset frequency of garbage collection once emacs has booted
 (add-hook 'emacs-startup-hook #'jl/reset-gc-threshold)
@@ -41,7 +41,7 @@
   (scroll-bar-mode -1))
 
 ;; Always load newest byte code
-(setq load-prefer-newer t)
+(setopt load-prefer-newer t)
 
 ;; try the following for unicode characters
 ;; (setq inhibit-compacting-font-caches t)
