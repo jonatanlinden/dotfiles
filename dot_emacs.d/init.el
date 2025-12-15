@@ -8,7 +8,7 @@
 ;; (mapconcat (quote identity)
 ;;            (sort (font-family-list) #'string-lessp) "\n"))
 
-(setq debug-on-error t)
+;(setq debug-on-error t)
 (defvar *is-mac* (eq system-type 'darwin))
 (defvar *is-win* (eq system-type 'windows-nt))
 
@@ -242,15 +242,29 @@
       use-package-minimum-reported-time 0.05
       )
 
+(use-package no-littering
+  :ensure t
+  :init
+  (setq auto-save-file-name-transforms
+        `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
+        custom-file (no-littering-expand-etc-file-name "custom.el")))
+
+(add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
+
+
 (use-package diminish
   :ensure (:wait t))
+
+(bind-key "C-x m" 'pop-to-mark-command)
+(setq set-mark-command-repeat-pop t)
+
 
 (use-package general
   :ensure (:wait t)
   :config
   (general-define-key
    [remap delete-char] 'delete-forward-char
-  ;; Better than default - from /u/zck
+   ;; Better than default - from /u/zck
    "M-c" 'capitalize-dwim
    "M-l" 'downcase-dwim
    "M-u" 'upcase-dwim
@@ -259,7 +273,7 @@
    "M-/" 'hippie-expand
    "s-/" 'hippie-expand
    ;; align code
-  "C-x \\" 'align-regexp
+   "C-x \\" 'align-regexp
    ;; mark-end-of-sentence is normally unassigned
    "M-h" 'mark-end-of-sentence
    ;; rebind to zap-up-to-char instead of zap-to-char
@@ -271,8 +285,8 @@
    )
 
   (general-def prog-mode-map
-   "s-f" 'mark-defun
-   )
+    "s-f" 'mark-defun
+    )
 
 
   ;;; open current file in explorer/finder
@@ -311,14 +325,6 @@
   )
 
 
-(use-package no-littering
-  :ensure t
-  :init
-  (setq auto-save-file-name-transforms
-        `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
-        custom-file (no-littering-expand-etc-file-name "custom.el")))
-
-(add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
 
 
 ;; load the personal settings
@@ -347,12 +353,9 @@
 
 (use-package server
   :if *is-win*
-  :init
-  (server-mode 1)
   :hook (after-init . (lambda ()
-                        (require 'server)
                         (unless (server-running-p)
-                          (server-start)))))
+                            (server-mode 1)))))
 
 (with-eval-after-load 'server
   (when (equal window-system 'w32)
@@ -440,14 +443,12 @@
   (uniquify-ignore-buffers-re "^\\*"))
 
 (use-package savehist
+  :init (savehist-mode)
   :config
   (setq savehist-additional-variables
         ;; search entries
         '(search-ring regexp-search-ring)
-        ;; save every minute
-        savehist-autosave-interval 60
-        )
-  (savehist-mode +1))
+        ))
 
 (use-package recentf
   :custom (recentf-max-saved-items 300)
@@ -584,20 +585,61 @@
   (add-to-list 'display-buffer-alist
                '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
                  nil
-                 (window-parameters (mode-line-format . none))))
+                 (window-parameters (mode-line-format . none)))))
 
-    )
+;; Consult users will also want the embark-consult package.
+(use-package embark-consult
+  :ensure t
+  :after (embark consult)
+  :demand t ; only necessary if you have the hook below
+  ;; if you want to have consult previews as you move around an
+  ;; auto-updating embark collect buffer
+  :hook
+  (embark-collect-mode . consult-preview-at-point-mode))
 
-  ;; Consult users will also want the embark-consult package.
-  (use-package embark-consult
-    :ensure t
-    :after (embark consult)
-    :demand t ; only necessary if you have the hook below
-    ;; if you want to have consult previews as you move around an
-    ;; auto-updating embark collect buffer
-    :hook
-    (embark-collect-mode . consult-preview-at-point-mode))
 
+(use-package corfu
+  :ensure t
+  :custom
+  ;; Make the popup appear quicker
+  (corfu-popupinfo-delay '(0.5 . 0.5))
+  ;; Always have the same width
+  (corfu-min-width 80)
+  (corfu-max-width corfu-min-width)
+  (corfu-count 14)
+  (corfu-scroll-margin 4)
+  ;; Have Corfu wrap around when going up
+  (corfu-cycle t)
+  (corfu-preselect-first t)
+  :bind (:map corfu-map
+              ;; Match `corfu-quick-complete' keybinding to `avy-goto-line'
+              ("s-j" . corfu-quick-complete))
+  :init
+  ;; Enable Corfu
+  (global-corfu-mode t)
+  ;; Enable Corfu history mode to act like `prescient'
+  (corfu-history-mode t)
+  ;; Allow Corfu to show help text next to suggested completion
+  (corfu-popupinfo-mode t))
+
+(use-package cape
+  :ensure t
+  :demand t
+  :init
+  ;; Add `completion-at-point-functions', used by `completion-at-point'.
+  (setq-default completion-at-point-functions
+                (append (default-value 'completion-at-point-functions)
+                        (list #'cape-dabbrev #'cape-file #'cape-abbrev))))
+
+(use-package completion-preview
+  :ensure nil
+  :bind (:map completion-preview-active-mode-map
+              ("M-f" . #'completion-preview-insert-word)
+              ("C-M-f" . #'completion-preview-insert-sexp))
+  :custom
+  (completion-preview-minimum-symbol-length 2)
+  :init
+  (global-completion-preview-mode))
 
 (use-package ace-window
   :ensure t
@@ -644,38 +686,7 @@
   ;;(setq show-tabs)
   )
 
-(use-package company
-  :ensure t
-  :diminish (company-mode . "(c)")
-  :commands company-mode
-  :custom (company-minimum-prefix-length 3)
-  (company-global-modes '(not text-mode))
-  (company-dabbrev-downcase nil)
-  (company-echo-delay 0) ; remove annoying blinking
-    ;; set default company-backends
-  ;; (company-backends
-  ;;       '((company-files
-  ;;          company-capf
-  ;;          company-yasnippet) company-dabbrev company-dabbrev-code))
-  :config
-  (setq lsp-completion-provider :capf)
-  :bind
-  (:map company-active-map
-        ("C-e" . company-other-backend)
-        ("C-n" . company-select-next-or-abort)
-        ("C-p" . company-select-previous-or-abort))
-  :hook ((after-init . global-company-mode)
-         (prog-mode . jl/prog-mode-hook))
-  )
 
-(use-package company-prescient
-  :after (prescient company)
-  :ensure t
-  :hook (company-mode . company-prescient-mode))
-
-
-;(use-package expand-region
-;  :bind* ("C-," . er/expand-region))
 (use-package expand-region
   :ensure t
   :bind
@@ -718,9 +729,7 @@
   :custom
   (vundo-glyph-alist vundo-unicode-symbols)
   (vundo-roll-back-on-quit nil)
-  :bind (("C-z" . 'undo)
-         )
-  )
+  :bind (("C-z" . 'undo)))
 
 (use-package find-file-in-project
   :ensure t
@@ -740,6 +749,10 @@
   (add-to-list 'flycheck-disabled-checkers 'ruby-reek)
   :hook (prog-mode . flycheck-mode))
 
+;; (use-package casual-symbol-overlay
+;;   :ensure t
+;;   :bind (:map symbol-overlay-mode-map ("C-i" . 'casual-symbol-overlay-tmenu)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LANGUAGES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (use-package lsp-mode
@@ -753,22 +766,6 @@
          (lsp-mode . lsp-enable-which-key-integration)
          ))
 
-;; lsp-ui: This contains all the higher level UI modules of lsp-mode, like flycheck support and code lenses.
-;; https://github.com/emacs-lsp/lsp-ui
-(use-package lsp-ui
-  :disabled t
-  :ensure t
-  :custom
-  (lsp-ui-sideline-enable nil)
-  (lsp-ui-doc-enable nil)
-  :after (lsp)
-  :bind  (:map lsp-ui-mode-map
-               ([remap xref-find-definitions] . lsp-ui-peek-find-definitions)
-               ([remap xref-find-references] . lsp-ui-peek-find-references)
-               )
-  :config
-  (lsp-ui-sideline-mode)
-  )
 
 (use-package flycheck-clang-tidy
   :ensure t
@@ -777,6 +774,38 @@
   :after (flycheck)
   :hook (c++-mode . flycheck-clang-tidy-setup)
   )
+
+;; (use-package envrc
+;;   :ensure t
+;;   :hook (after-init . envrc-global-mode)
+;; )
+
+
+(use-package pyvenv
+  :ensure t)
+
+(use-package reformatter
+  :ensure t
+  :config
+  (reformatter-define dd/ruff-format
+    :program "uvx"
+    :args `("ruff" "format" "--stdin-filename" ,buffer-file-name "-"))
+  (reformatter-define dd/ruff-sort
+    :program "uvx"
+    :args `("ruff" "check" "--select" "I" "--fix" "--stdin-filename" ,buffer-file-name "-")))
+
+(defun dd/python-init ()
+  (let* ((project (project-current))
+         (project-root (when project (project-root project)))
+         (venv-path (when project-root
+                      (expand-file-name ".venv" project-root))))
+    (when (and venv-path (file-directory-p venv-path))
+      (make-local-variable 'pyvenv-virtual-env)
+      (pyvenv-activate venv-path))
+    (dd/ruff-format-on-save-mode +1)
+    (dd/ruff-sort-on-save-mode +1)))
+
+(add-hook 'python-base-mode-hook #'dd/python-init)
 
 (use-package groovy-mode
   :ensure t
@@ -792,41 +821,30 @@
   (setq inf-ruby-default-implementation "ruby")
   :hook (ruby-mode . inf-ruby-minor-mode))
 
-(defun treesit-install-all-grammars () (interactive)
-       (dolist (lang treesit-language-source-alist)
-         (unless (treesit-language-available-p (car lang))
-           (treesit-install-language-grammar (car lang)))))
-
-(use-package treesit
-  :ensure nil
-  :init
-  (setq treesit-language-source-alist
-        '((javascript . ("git@github.com:tree-sitter/tree-sitter-javascript.git"))
-          (json . ("git@github.com:tree-sitter/tree-sitter-json.git"))
-          (ruby . ("git@github.com:tree-sitter/tree-sitter-ruby.git"))
-          (yaml . ("https://github.com/ikatyang/tree-sitter-yaml"))))
+(use-package treesit-auto
+  :ensure t
+  :custom
+  (treesit-auto-install 'prompt)
   :config
-  (treesit-install-all-grammars)
-  (setq major-mode-remap-alist
-        '((yaml-mode . yaml-ts-mode)
-          (css-mode . css-ts-mode)
-          (typescript-mode . typescript-ts-mode)
-          (dockerfile-mode . dockerfile-ts-mode)
-          (javascript-mode . js-ts-mode)
-          (json-mode . json-ts-mode)
-          (ruby-mode . ruby-ts-mode)
-          (html-mode . html-ts-mode))))
+  (treesit-auto-add-to-auto-mode-alist 'all)
+  (global-treesit-auto-mode))
 
 (use-package eglot
-  :hook
-  (typescript-ts-mode . eglot-ensure)
-  (js-ts-mode . eglot-ensure)
-  (ruby-ts-mode . lsp)
-  (json-ts-mode . eglot-ensure)
-  (yaml-ts-mode . eglot-ensure)
-  (dockerfile-ts-mode . eglot-ensure)
-  (css-mode . eglot-ensure)
-  (html-mode . eglot-ensure))
+ :config (add-to-list 'eglot-server-programs
+                      `(python-base-mode
+                        . ,(eglot-alternatives '(("basedpyright-langserver" "--stdio")
+                                                 ("ty" "server")
+                                                 ("pyright-langserver" "--stdio")))))
+ :hook
+ (typescript-ts-mode . eglot-ensure)
+ (js-ts-mode . eglot-ensure)
+ (ruby-ts-mode . lsp)
+ (json-ts-mode . eglot-ensure)
+ (yaml-ts-mode . eglot-ensure)
+ (dockerfile-ts-mode . eglot-ensure)
+ (css-mode . eglot-ensure)
+ (python-mode . eglot-ensure)
+ (html-mode . eglot-ensure))
 
 (use-package ruby-mode
   :ensure nil
@@ -1084,6 +1102,9 @@
 
 (use-package clang-format
   :ensure t
+  :custom
+  (clang-format-style "file")
+  (clang-format-fallback-style "Google")
   :after cc-mode
   :commands (clang-format-buffer clang-format-defun)
   :bind* (:map c++-mode-map
@@ -1143,7 +1164,7 @@
 (use-package ws-butler
   :ensure t
   :custom
-  (ws-butler-keep-whitespace-before-point nil)
+  (ws-butler-keep-whitespace-before- nil)
   :diminish ""
   :config
   (ws-butler-global-mode)
@@ -1225,9 +1246,7 @@
   :custom (org-mru-clock-how-many 10)
   :bind* (("<f8>" . org-mru-clock-in))
   :commands (org-mru-clock-in org-mru-clock-select-recent-task)
-  :config
-  (add-hook 'minibuffer-setup-hook #'org-mru-clock-embark-minibuffer-hook)
-  )
+  :config (add-hook 'minibuffer-setup-hook #'org-mru-clock-embark-minibuffer-hook))
 
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 
@@ -1239,15 +1258,6 @@
 
 (csetq ffap-machine-p-known 'reject)
 
-(use-package mediawiki
-  :ensure t
-  :commands (mediawiki-mode)
-  :init
-  ;; workaround, unable to run mediawiki-open otherwise
-   (setq url-user-agent "EMACS")
-  :hook (mediawiki-mode . visual-line-mode)
-  )
-
 (use-package alert
   :if window-system
   :ensure t
@@ -1257,9 +1267,6 @@
 
 (use-package cmake-mode
   :ensure (:host github :repo "emacsmirror/cmake-mode" :files (:defaults "*"))
-  :config
-  (make-local-variable 'company-backends)
-  (push 'company-cmake company-backends)
   :mode "CMakeLists.txt")
 
 (use-package toml-mode
@@ -1280,6 +1287,12 @@
   :after rust
   :ensure t
   :hook (flycheck-mode . flycheck-rust-setup))
+
+
+(use-package ninja-mode
+  :mode ("\\.ninja\\'")
+  :ensure (ninja-mode :type git :host github repo: "ninja-build/ninja-emacs"))
+
 
 (use-package multiple-cursors
   :ensure t
@@ -1456,9 +1469,9 @@
   :bind (("C-c C-/" . point-history-show))
   :init (setq point-history-ignore-buffer "^ \\*Minibuf\\|^ \\*point-history-show*"))
 
-(use-package jl-ocaml
-  :load-path "lisp"
-  )
+;; (use-package jl-ocaml
+;;   :load-path "lisp"
+;;   )
 
 (use-package go-mode
   :ensure t
@@ -1496,7 +1509,6 @@
     (ediff3 file0 file1 file2)))
 
 (add-to-list 'command-switch-alist '("-diff3" . command-line-diff3))
-
 
 (cheatsheet-add
  :group 'General

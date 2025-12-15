@@ -1,5 +1,6 @@
 # PowerShellGet\Install-Module posh-git -Scope CurrentUser -AllowPrerelease -Force
 # Install-Module posh-sshell -Scope CurrentUser
+# Install-Module z -Scope CurrentUser
 
 Import-Module PSReadLine
 Import-Module posh-git
@@ -27,3 +28,4 @@ function Invoke-Starship-PreCommand {
 }
 
 Invoke-Expression (&starship init powershell)
+Invoke-Expression "$(direnv hook pwsh)"
