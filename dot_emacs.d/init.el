@@ -44,6 +44,9 @@
 (when (> emacs-major-version 28)
  (pixel-scroll-precision-mode))
 
+(setopt use-short-answers t)
+(setopt use-dialog-box nil)
+
 (when (file-exists-p jonatan-personal-preload)
   (load jonatan-personal-preload))
 
@@ -172,7 +175,7 @@
       `((".*" ,temporary-file-directory t)))
 
 ;; revert buffers automatically when underlying files are changed externally
-(global-auto-revert-mode t)
+(global-auto-revert-mode)
 
 ;; handle files with long lines
 (global-so-long-mode 1)
@@ -189,18 +192,45 @@
 ;; smart tab behavior - indent or complete
 (setq tab-always-indent 'complete)
 
-;; development version of emacs, set build date
-(setq elpaca-core-date '(20250424))
+;;Emacs normally fontifies text even while you’re actively typing.
+(setq redisplay-skip-fontification-on-input t)
 
-(defvar elpaca-installer-version 0.11)
+(repeat-mode 1)
+(setq repeat-exit-timeout 5)
+
+;; live visual feedback as you compose a regexp in the minibuffer
+(minibuffer-regexp-mode 1)
+
+(setq window-combination-resize t)
+
+(setq read-extended-command-predicate
+      #'command-completion-default-include-p)
+;; (minibuffer-prompt-properties
+;;    '(read-only t cursor-intangible t face minibuffer-prompt))
+
+(setq kill-do-not-save-duplicates t)
+;; Save the Clipboard Before Killing
+(setq save-interprogram-paste-before-kill t)
+
+;; Don’t Render Cursors in Non-Focused Windows
+(setq-default cursor-in-non-selected-windows nil)
+(setq highlight-nonselected-windows nil)
+
+;; Increase Process Output Buffer for LSP
+(setq read-process-output-max (* 4 1024 1024)) ; 4MB
+
+;; development version of emacs, set build date
+(setq elpaca-core-date '(20260318))
+
+(defvar elpaca-installer-version 0.12)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
-(defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
+(defvar elpaca-sources-directory (expand-file-name "sources/" elpaca-directory))
 (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
                               :ref nil :depth 1 :inherit ignore
                               :files (:defaults "elpaca-test.el" (:exclude "extensions"))
-                              :build (:not elpaca--activate-package)))
-(let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
+                              :build (:not elpaca-activate)))
+(let* ((repo  (expand-file-name "elpaca/" elpaca-sources-directory))
        (build (expand-file-name "elpaca/" elpaca-builds-directory))
        (order (cdr elpaca-order))
        (default-directory repo))
@@ -231,6 +261,8 @@
 (add-hook 'after-init-hook #'elpaca-process-queues)
 (elpaca `(,@elpaca-order))
 
+(elpaca-no-symlink-mode)
+
 (setq elpaca-queue-limit 20)
 
 (elpaca elpaca-use-package
@@ -238,7 +270,7 @@
   (elpaca-use-package-mode))
 
 (setq use-package-verbose t
-      ;; use-package-compute-statistics t
+      use-package-compute-statistics t
       use-package-minimum-reported-time 0.05
       )
 
@@ -255,9 +287,7 @@
 (use-package diminish
   :ensure (:wait t))
 
-(bind-key "C-x m" 'pop-to-mark-command)
 (setq set-mark-command-repeat-pop t)
-
 
 (use-package general
   :ensure (:wait t)
@@ -294,7 +324,9 @@
     (general-define-key "M-O" #'jl/open-folder-in-explorer))
   )
 
-
+(use-package unfill
+  :ensure t
+  :bind ([remap fill-paragraph] . unfill-toggle))
 
 (use-package org :ensure t
   :custom
@@ -687,14 +719,19 @@
   )
 
 
-(use-package expand-region
+(use-package expreg
   :ensure t
-  :bind
-  ("M-2" . er/expand-region)
-  ("s-0" . er/expand-region)
-  ("C-," . er/mark-word)
-  )
+  :bind (("C-=" . expreg-expand)
+         ("C--" . expreg-contract)))
 
+(defvar expreg-repeat-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "=" #'expreg-expand)
+    (define-key map "-" #'expreg-contract)
+    map))
+
+(put 'expreg-expand 'repeat-map 'expreg-repeat-map)
+(put 'expreg-contract 'repeat-map 'expreg-repeat-map)
 
 (use-package change-inner
   :ensure t
@@ -821,16 +858,22 @@
   (setq inf-ruby-default-implementation "ruby")
   :hook (ruby-mode . inf-ruby-minor-mode))
 
+(use-package treesit
+  :config
+  (add-to-list 'treesit-extra-load-path (expand-file-name "treesit" user-emacs-directory)))
+
 (use-package treesit-auto
   :ensure t
-  :custom
-  (treesit-auto-install 'prompt)
   :config
-  (treesit-auto-add-to-auto-mode-alist 'all)
+  (treesit-auto-add-to-auto-mode-alist)
   (global-treesit-auto-mode))
 
+(use-package treesit-fold
+  :ensure (treesit-fold :type git :host github :repo "emacs-tree-sitter/treesit-fold"))
+
 (use-package eglot
- :config (add-to-list 'eglot-server-programs
+  :custom (eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
+  :config (add-to-list 'eglot-server-programs
                       `(python-base-mode
                         . ,(eglot-alternatives '(("basedpyright-langserver" "--stdio")
                                                  ("ty" "server")
@@ -921,6 +964,9 @@
          ("\\.markdown\\'" . gfm-mode))
   :hook (my-markdown-live-preview)
   )
+
+(use-package orgalist
+  :ensure t)
 
 (use-package yaml-mode
   :ensure t
@@ -1066,12 +1112,12 @@
   :mode "\\.db\\'"
   )
 
-(use-package c++-mode
+(use-package c++-ts-mode
   :ensure nil
   :after smartparens
   :bind
   ([remap kill-sexp] . sp-kill-hybrid-sexp)
-  (:map c++-mode-map
+  (:map c++-ts-mode-map
         ("C-c C-o" . ff-find-other-file))
   :hook
   (c++-mode . jl/c++-mode-hook)
@@ -1312,6 +1358,10 @@
   :after transient
   :ensure t
   :custom (magit-section-initial-visibility-alist '((stashes . hide) (untracked . hide)))
+          (magit-disable-section-inserter 'magit-insert-tags-header)
+  :config
+          (remove-hook 'magit-status-headers-hook 'magit-insert-tags-header)
+          (add-hook 'magit-status-sections-hook #'magit-insert-worktrees t)
   :bind (("C-x g" . magit-status)
          ("C-c g l" . magit-list-repositories)
          )
@@ -1593,3 +1643,4 @@
 
 (provide 'init)
 ;;; init.el ends here
+(put 'narrow-to-region 'disabled nil)

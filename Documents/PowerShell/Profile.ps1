@@ -10,6 +10,13 @@ start-SshAgent
 Set-PSReadLineOption -EditMode Emacs
 Set-PSReadLineKeyHandler -Key Tab -Function Complete
 
+if (get-command -errorAction SilentlyContinue) {
+   if(Test-Path -Path alias:ls) {
+     remove-item alias:ls
+   }
+   New-Alias ls eza
+}
+
 $Env:EDITOR="emacsclient"
 
 function which { param($bin) Get-Command $bin }
@@ -28,4 +35,3 @@ function Invoke-Starship-PreCommand {
 }
 
 Invoke-Expression (&starship init powershell)
-Invoke-Expression "$(direnv hook pwsh)"
