@@ -274,6 +274,38 @@
       use-package-minimum-reported-time 0.05
       )
 
+(use-package emacs
+  :ensure nil
+  :custom
+  (ibuffer-human-readable-size t)
+  (kill-region-dwim 'emacs-word)
+  (uniquify-after-kill-buffer-flag t)
+  (delete-pair-push-mark t)
+  (completion-eager-update t)
+  (completion-eager-display 'auto)
+  (minibuffer-visible-completions 'up-down)
+  :config
+  (setq mode-line-collapse-minor-modes '(abbrev-mode
+                                         flyspell-mode
+                                         flyspell-prog-mode
+                                         eldoc-mode
+                                         smartparens-mode
+
+                                         ))
+  (setopt kill-region-dwim 'emacs-word)
+)
+
+(use-package speedbar
+  :ensure nil
+  :commands (speedbar)
+  :custom
+  (speedbar-prefer-window t)
+  (speedbar-use-images nil)
+  (speedbar-window-default-width 25)
+  (speedbar-window-max-width 25)
+)
+
+
 (use-package no-littering
   :ensure t
   :init
@@ -366,8 +398,7 @@
 
 (use-package utils
   :load-path "lisp"
-  :commands (kill-region-or-backward-word)
-  :bind (("C-w" . kill-region-or-backward-word)
+  :bind (
          (:map emacs-lisp-mode-map
                ([remap eval-last-sexp] . jl/eval-last-sexp-or-region))
          )
@@ -457,7 +488,6 @@
   :diminish smartparens-mode)
 
 (use-package abbrev
-  :diminish ""
   :custom (save-abbrevs 'silently)
   :init (setq abbrev-mode t)
   :config
@@ -534,7 +564,6 @@
   ([remap query-replace] . anzu-query-replace)
   ([remap query-replace-regexp] . anzu-query-replace-regexp)
   ("H-q" . anzu-query-replace-at-cursor-thing)
-  :diminish ""
   :init
   (setq anzu-cons-mode-line-p nil)
   :hook
@@ -889,6 +918,13 @@
  (python-mode . eglot-ensure)
  (html-mode . eglot-ensure))
 
+(use-package breadcrumb
+  :ensure t
+  :commands (breadcrumb-mode)
+  :config
+  (setq which-func-functions #'(breadcrumb-imenu-crumbs))
+)
+
 (use-package ruby-mode
   :ensure nil
   :mode ("Rakefile" "\\.rb\\'")
@@ -917,56 +953,19 @@
   :hook (ruby-mode . ruby-tools-mode)
   :diminish ruby-tools-mode)
 
-(defun gfm-markdown-filter (buffer)
-  "Configure a default layout for rendering markdown files."
-  (princ
-   (with-temp-buffer
-     (let ((tmp (buffer-name)))
-       (set-buffer buffer)
-       (set-buffer (markdown tmp))
-       (format "<!DOCTYPE html><html><title>Markdown preview</title><link rel=\"stylesheet\" href = \"https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/3.0.1/github-markdown.min.css\"/>
-<body><article class=\"markdown-body\" style=\"box-sizing: border-box;min-width: 200px;max-width: 980px;margin: 0 auto;padding: 45px;\">%s</article></body></html>" (buffer-string))))
-   (current-buffer)))
-
-(use-package impatient-mode
-  :ensure t
-  :custom (imp-set-user-filter gfm-markdown-filter)
-  :commands impatient-mode
-  )
-
-(use-package simple-httpd
-  :ensure t
-  :custom
-  (httpd-port 7070)
-;; (setq httpd-host (system-name))
-  )
-
-
-
-(defun my-markdown-live-preview ()
-"Live preview markdown."
-(interactive)
-(unless (process-status "httpd")
-(httpd-start))
-(impatient-mode)
-(imp-set-user-filter 'my-markdown-filter
-(imp-visit-buffer)
-)
-)
 
 (use-package markdown-mode
-  :ensure t
+  :disabled t
   :custom (markdown-fontify-code-block-natively t)
-  (markdown-command "pandoc -t html5 -f gfm --embed-resources --standalone --mathjax --quiet --highlight-style=pygments --template github.html")
-  (markdown-live-preview-engine 'pandoc)
-  (markdown-header-scaling t)
   :mode (("\\.md\\'" . gfm-mode)
          ("\\.markdown\\'" . gfm-mode))
-  :hook (my-markdown-live-preview)
   )
 
-(use-package orgalist
-  :ensure t)
+(use-package markdown-ts-mode
+  :ensure nil
+  :mode (("\\.md\\'" . gfm-mode)
+         ("\\.markdown\\'" . gfm-mode))
+  :defer t)
 
 (use-package yaml-mode
   :ensure t
