@@ -169,3 +169,6 @@ source /usr/local/opt/antidote/share/antidote/antidote.zsh
 # antidote load
 
 RPROMPT='$(nvm_prompt_info)'
+
+# Scaleway CLI autocomplete initialization.
+eval "$(scw autocomplete script shell=zsh)"
