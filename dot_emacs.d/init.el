@@ -219,9 +219,6 @@
 ;; Increase Process Output Buffer for LSP
 (setq read-process-output-max (* 4 1024 1024)) ; 4MB
 
-;; development version of emacs, set build date
-(setq elpaca-core-date '(20260318))
-
 (defvar elpaca-installer-version 0.12)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
 (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
@@ -475,7 +472,7 @@
   :hook ((lisp-mode emacs-lisp-mode) . smartparens-strict-mode)
   :custom
   (sp-base-key-bindings 'paredit)
-  (sp-autoskip-closing-pair 'always)
+  (sp-autoskip-closing-pair t)
   (sp-hybrid-kill-entire-symbol nil)
   (sp-show-pair-delay 0)
   :config
@@ -484,6 +481,25 @@
   (sp-use-paredit-bindings)
   (unbind-key "M-?" smartparens-mode-map)
   (show-smartparens-global-mode +1)
+  (defun jl/sp-close-or-skip (&optional arg)
+    "Insert a closing delimiter, or jump out of the enclosing list.
+Jump past the closer of the innermost enclosing list when the typed
+char matches it and the surrounding top-level form is balanced;
+otherwise insert the char literally (closing the unbalanced list)."
+    (interactive "p")
+    (let* ((char last-command-event)
+           (ppss (syntax-ppss))
+           (inner (nth 1 ppss))
+           (outer (car (nth 9 ppss))))
+      (if (and inner
+               (not (nth 8 ppss))           ; not in string/comment
+               (eq char (matching-paren (char-after inner)))
+               (ignore-errors (scan-lists outer 1 0)))
+          (goto-char (scan-lists inner 1 0))
+        (let ((sp-autoskip-closing-pair nil))
+          (self-insert-command arg)))))
+  (dolist (key '(")" "]" "}"))
+    (define-key smartparens-mode-map (kbd key) #'jl/sp-close-or-skip))
   ;; :diminish (smartparens-mode .  "()")
   :diminish smartparens-mode)
 
@@ -821,17 +837,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LANGUAGES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(use-package lsp-mode
-  :ensure t
-  :custom
-  (lsp-headerline-breadcrumb-enable t)
-  (lsp-prefer-flymake nil)
-  ;;(lsp-auto-configure nil)
-  :commands lsp
-  :hook ((ruby-mode . lsp)
-         (lsp-mode . lsp-enable-which-key-integration)
-         ))
-
 
 (use-package flycheck-clang-tidy
   :ensure t
@@ -910,7 +915,7 @@
  :hook
  (typescript-ts-mode . eglot-ensure)
  (js-ts-mode . eglot-ensure)
- (ruby-ts-mode . lsp)
+ (ruby-ts-mode . eglot-ensure)
  (json-ts-mode . eglot-ensure)
  (yaml-ts-mode . eglot-ensure)
  (dockerfile-ts-mode . eglot-ensure)
@@ -933,7 +938,7 @@
   (use-package smartparens-ruby)
   :hook
   (ruby-mode . subword-mode)
-  (ruby-mode . lsp)
+  (ruby-mode . eglot-ensure)
   :interpreter "ruby"
   :bind
   (([(meta down)] . forward-sexp)
@@ -1120,7 +1125,7 @@
         ("C-c C-o" . ff-find-other-file))
   :hook
   (c++-mode . jl/c++-mode-hook)
-  (c++-mode . lsp)
+  (c++-mode . eglot-ensure)
   )
 
 (use-package modern-cpp-font-lock
@@ -1321,7 +1326,7 @@
 
 (use-package rust-mode
   :ensure t
-  :hook (rust-mode . lsp))
+  :hook (rust-mode . eglot-ensure))
 
 ;; Add keybindings for interacting with Cargo
 (use-package cargo
@@ -1530,7 +1535,7 @@
          ;; ("C-c C-j" . lsp-find-definition)
          ;; ("C-c C-d" . lsp-describe-thing-at-point)
          )
-  :hook ((go-mode . lsp-deferred)))
+  :hook ((go-mode . eglot-ensure)))
 
 (use-package csv-mode
   :ensure t
