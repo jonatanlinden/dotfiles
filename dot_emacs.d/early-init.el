@@ -1,14 +1,15 @@
 ;;; early-init.el --- early bird  -*- no-byte-compile: t; lexical-binding: t -*-
 
-;; reduce the frequency of garbage collection by making it happen on
-;; each 50MB of allocated data (the default is on every 0.76MB)
-(setopt gc-cons-threshold (* 128 1024 1024))
+;; reduce the frequency of garbage collection during startup by making
+;; it happen on each 128MB of allocated data (the default is 0.76MB).
+;; Plain setq here: setopt would load the custom library this early.
+(setq gc-cons-threshold (* 128 1024 1024))
 
 (message "Starting emacs %s" (current-time-string))
 
 (defun jl/reset-gc-threshold ()
-  "Reset `gc-cons-threshold' to its default value."
-  (setopt gc-cons-threshold (* 16 1024 1024)))
+  "Lower `gc-cons-threshold' to 16MB once startup is done."
+  (setq gc-cons-threshold (* 16 1024 1024)))
 
 ;; reset frequency of garbage collection once emacs has booted
 (add-hook 'emacs-startup-hook #'jl/reset-gc-threshold)
@@ -41,14 +42,17 @@
   (scroll-bar-mode -1))
 
 ;; Always load newest byte code
-(setopt load-prefer-newer t)
+(setq load-prefer-newer t)
 
 ;; try the following for unicode characters
 ;; (setq inhibit-compacting-font-caches t)
 
 ;; Emacs "updates" its ui more often than it needs to, so we slow it down
 ;; slightly from 0.5s:
-(setq idle-update-delay 1.0)
+;; `idle-update-delay' became an obsolete alias in Emacs 30.
+(if (< emacs-major-version 30)
+    (setq idle-update-delay 1.0)
+  (setq which-func-update-delay 1.0))
 
 ;; Avoid emacs frame resize after font change for speed
 (setq frame-inhibit-implied-resize t)
@@ -80,9 +84,11 @@
 ;    (expand-file-name  "var/eln-cache/" user-emacs-directory))))
 
 
-(set-face-font 'default "Cascadia Code 10")
-(copy-face 'default 'fixed-pitch)
-(set-face-font 'variable-pitch "Segoe UI Semibold-10")
+;; Segoe UI is a Windows font, and Cascadia Code isn't installed on the Mac
+(when *is-win*
+  (set-face-font 'default "Cascadia Code 10")
+  (copy-face 'default 'fixed-pitch)
+  (set-face-font 'variable-pitch "Segoe UI Semibold-10"))
 
 (cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
       (*is-linux* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
