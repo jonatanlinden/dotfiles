@@ -9,8 +9,7 @@
 ;;            (sort (font-family-list) #'string-lessp) "\n"))
 
 ;(setq debug-on-error t)
-(defvar *is-mac* (eq system-type 'darwin))
-(defvar *is-win* (eq system-type 'windows-nt))
+;; *is-mac*, *is-win* and *is-linux* are defined in early-init.el
 
 
 ;; disable temporarily
@@ -41,8 +40,7 @@
 
 (defconst jonatan-personal-preload (expand-file-name "personal/preload.el" user-emacs-directory))
 
-(when (> emacs-major-version 28)
- (pixel-scroll-precision-mode))
+(pixel-scroll-precision-mode)
 
 (setopt use-short-answers t)
 (setopt use-dialog-box nil)
@@ -58,7 +56,6 @@
 (unless (file-exists-p jonatan-personal-dir)
   (make-directory jonatan-personal-dir))
 
-(setenv "GPG_AGENT_INFO" nil)
 (setq auth-sources
     '((:source "~/.emacs.d/.authinfo.gpg")))
 
@@ -117,11 +114,6 @@
   )
 )
 
-(defmacro csetq (variable value)
-  `(funcall (or (get ',variable 'custom-set)
-                'set-default)
-            ',variable ,value))
-
 ;; warn when opening files bigger than 10MB
 (setq large-file-warning-threshold 10000000)
 
@@ -145,9 +137,6 @@
 (column-number-mode t)
 (size-indication-mode t)
 
-;; enable y/n answers
-(setq-default use-short-answers t)
-
 ;; more useful frame title, that show either a file or a
 ;; buffer name (if the buffer isn't visiting a file)
 (setq frame-title-format
@@ -168,11 +157,8 @@
 ;; delete the selection with a keypress
 ;; (delete-selection-mode t)
 
-;; store all backup and autosave files in the tmp dir
-(setq backup-directory-alist
-      `((".*" . ,temporary-file-directory)))
-(setq auto-save-file-name-transforms
-      `((".*" ,temporary-file-directory t)))
+;; backups and auto-saves go to var/backup/ and var/auto-save/, see
+;; `no-littering-theme-backups' in the no-littering block
 
 ;; revert buffers automatically when underlying files are changed externally
 (global-auto-revert-mode)
@@ -185,9 +171,6 @@
 (set-keyboard-coding-system 'utf-8-unix)
 (set-terminal-coding-system 'utf-8-unix)
 
-(setq process-coding-system-alist
-  (cons '("ruby-ls" utf-8 . utf-8) process-coding-system-alist))
-
 
 ;; smart tab behavior - indent or complete
 (setq tab-always-indent 'complete)
@@ -198,8 +181,9 @@
 (repeat-mode 1)
 (setq repeat-exit-timeout 5)
 
-;; live visual feedback as you compose a regexp in the minibuffer
-(minibuffer-regexp-mode 1)
+;; live visual feedback as you compose a regexp in the minibuffer (Emacs 30+)
+(when (fboundp 'minibuffer-regexp-mode)
+  (minibuffer-regexp-mode 1))
 
 (setq window-combination-resize t)
 
@@ -276,7 +260,6 @@
   :custom
   (ibuffer-human-readable-size t)
   (kill-region-dwim 'emacs-word)
-  (uniquify-after-kill-buffer-flag t)
   (delete-pair-push-mark t)
   (completion-eager-update t)
   (completion-eager-display 'auto)
@@ -287,14 +270,18 @@
                                          flyspell-prog-mode
                                          eldoc-mode
                                          smartparens-mode
-
-                                         ))
-  (setopt kill-region-dwim 'emacs-word)
-)
+                                         )))
 
 (use-package speedbar
   :ensure nil
   :commands (speedbar)
+  :hook (eglot-managed-mode . jl/speedbar-for-eglot)
+  :init
+  (defun jl/speedbar-for-eglot ()
+    "Open the speedbar when Eglot starts in a git-controlled directory."
+    (when (and (eglot-managed-p)
+               (locate-dominating-file default-directory ".git"))
+      (save-selected-window (speedbar 1))))
   :custom
   (speedbar-prefer-window t)
   (speedbar-use-images nil)
@@ -306,9 +293,10 @@
 (use-package no-littering
   :ensure t
   :init
-  (setq auto-save-file-name-transforms
-        `((".*" ,(no-littering-expand-var-file-name "auto-save/") t))
-        custom-file (no-littering-expand-etc-file-name "custom.el")))
+  (setq custom-file (no-littering-expand-etc-file-name "custom.el"))
+  :config
+  ;; backups in var/backup/, auto-saves in var/auto-save/
+  (no-littering-theme-backups))
 
 (add-hook 'elpaca-after-init-hook (lambda () (load custom-file 'noerror)))
 
@@ -327,7 +315,7 @@
    "M-c" 'capitalize-dwim
    "M-l" 'downcase-dwim
    "M-u" 'upcase-dwim
-   "C-x O"  'other-window-prev
+   "C-x O"  (lambda () (interactive) (other-window -1))
    ;; use hippie-expand instead of dabbrev
    "M-/" 'hippie-expand
    "s-/" 'hippie-expand
@@ -335,17 +323,11 @@
    "C-x \\" 'align-regexp
    ;; mark-end-of-sentence is normally unassigned
    "M-h" 'mark-end-of-sentence
-   ;; rebind to zap-up-to-char instead of zap-to-char
-   "M-z" 'zap-up-to-char
    ;; switch between buffers fast
    "<f1>" 'previous-buffer
    "<f2>" 'next-buffer
    [remap comment-box] 'jl/comment-box
    )
-
-  (general-def prog-mode-map
-    "s-f" 'mark-defun
-    )
 
 
   ;;; open current file in explorer/finder
@@ -361,17 +343,15 @@
   :custom
   (org-table-duration-custom-format 'hours)
   (org-export-backends '(ascii html md))
-  (org-directory "c:/work/notes")
+  (org-directory (if *is-win* "c:/work/notes" "~/org"))
   (org-hide-emphasis-markers t)
   (org-clock-persist t)
-  (org-duration-format (quote h:mm))
+  (org-duration-format '(("h" . t) (special . 2)))
   :bind (("C-c c" . org-capture))
   :config
   (org-clock-persistence-insinuate)
-  (setq org-duration-format '(("h" . t) (special . 2)))
   (setq org-default-notes-file (concat org-directory "/notes.org"))
-  :hook org-mode . (lambda () (electric-indent-mode -1))
-  )
+  :hook (org-mode . (lambda () (electric-indent-mode -1))))
 
 (use-package denote
   :ensure t
@@ -431,7 +411,8 @@
                                      (magit-project-status "Magit" "m"))))
 
 (use-package solarized-theme
-  :if window-system
+  ;; Not `:if window-system': under a daemon that is nil at startup,
+  ;; even though the frames created later are graphical.
   :ensure t
   :custom
   (solarized-scale-org-headlines nil)
@@ -447,9 +428,9 @@
   )
 
 (use-package color-theme-sanityinc-tomorrow
-  :unless window-system
+  :unless (or window-system (daemonp))
   :ensure t
-  :init (load-theme 'sanityinc-tomorrow-night)
+  :init (load-theme 'sanityinc-tomorrow-night t)
   )
 
 (use-package mood-line
@@ -471,16 +452,15 @@
   :ensure t
   :hook ((lisp-mode emacs-lisp-mode) . smartparens-strict-mode)
   :custom
-  (sp-base-key-bindings 'paredit)
+  (sp-base-key-bindings 'paredit)  ; installs the paredit-style bindings
   (sp-autoskip-closing-pair t)
   (sp-hybrid-kill-entire-symbol nil)
-  (sp-show-pair-delay 0)
   :config
   (require 'smartparens-config)
   (smartparens-global-mode t)
-  (sp-use-paredit-bindings)
   (unbind-key "M-?" smartparens-mode-map)
-  (show-smartparens-global-mode +1)
+  ;; matching pairs are highlighted by show-paren-mode, not
+  ;; show-smartparens-mode
   (defun jl/sp-close-or-skip (&optional arg)
     "Insert a closing delimiter, or jump out of the enclosing list.
 Jump past the closer of the innermost enclosing list when the typed
@@ -505,7 +485,7 @@ otherwise insert the char literally (closing the unbalanced list)."
 
 (use-package abbrev
   :custom (save-abbrevs 'silently)
-  :init (setq abbrev-mode t)
+  :init (setq-default abbrev-mode t)
   :config
   (if (file-exists-p abbrev-file-name)
       (quietly-read-abbrev-file)))
@@ -515,18 +495,18 @@ otherwise insert the char literally (closing the unbalanced list)."
   :custom
   (uniquify-separator "/")
   (uniquify-buffer-name-style 'forward)
-  ;; rename after killing uniquified
-  (uniquify-after-kill-buffer-p t)
+  ;; Renaming after killing a uniquified buffer is the default; the
+  ;; variable was renamed in Emacs 31, so it is not set here.
   ;; don't muck with special buffers
   (uniquify-ignore-buffers-re "^\\*"))
 
 (use-package savehist
   :init (savehist-mode)
   :config
-  (setq savehist-additional-variables
-        ;; search entries
-        '(search-ring regexp-search-ring)
-        ))
+  ;; add-to-list, not setq: other packages (e.g. corfu-history) add
+  ;; their own variables here
+  (dolist (var '(search-ring regexp-search-ring))
+    (add-to-list 'savehist-additional-variables var)))
 
 (use-package recentf
   :custom (recentf-max-saved-items 300)
@@ -535,8 +515,9 @@ otherwise insert the char literally (closing the unbalanced list)."
   ;; problems with remote files
   (recentf-auto-cleanup 'never)
   (recentf-exclude '(".*-autoloads\\.el\\'" "COMMIT_EDITMSG\\'"))
-  (add-to-list 'recentf-exclude no-littering-var-directory)
-  (add-to-list 'recentf-exclude no-littering-etc-directory)
+  :config
+  (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-var-directory))
+  (add-to-list 'recentf-exclude (recentf-expand-file-name no-littering-etc-directory))
   :hook (after-init . recentf-mode))
 
 (use-package crux
@@ -556,7 +537,6 @@ otherwise insert the char literally (closing the unbalanced list)."
          ("C-^" . crux-top-join-line)
          ("s-k" . crux-kill-whole-line)
          ("C-<backspace>" . crux-kill-line-backwards)
-         ("C-o" . crux-smart-open-line-above)
          ([remap open-line] . crux-smart-open-line-above)
          ([remap move-beginning-of-line] . crux-move-beginning-of-line)
          ([(shift return)] . crux-smart-open-line)
@@ -591,7 +571,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   (avy-style 'de-bruijn)
   (avy-background t)
   :bind (("M--" . avy-goto-char-timer)
-         ([remap goto-line] . avy-goto-line)
+         ("M-g l" . avy-goto-line)
          )
   :config
   (avy-setup-default)
@@ -603,8 +583,8 @@ otherwise insert the char literally (closing the unbalanced list)."
 (use-package avy-zap
   :ensure t
   :bind
-  ("M-z" . avy-zap-to-char-dwim)
-  ("M-z" . avy-zap-up-to-char-dwim))
+  ("M-z" . avy-zap-up-to-char-dwim)
+  ("M-Z" . avy-zap-to-char-dwim))
 
 ;; saveplace remembers your location in a file when saving files
 (use-package saveplace
@@ -687,9 +667,9 @@ otherwise insert the char literally (closing the unbalanced list)."
   (corfu-scroll-margin 4)
   ;; Have Corfu wrap around when going up
   (corfu-cycle t)
-  (corfu-preselect-first t)
+  (corfu-preselect 'first)
   :bind (:map corfu-map
-              ;; Match `corfu-quick-complete' keybinding to `avy-goto-line'
+              ;; pick a candidate by its avy-style hint key
               ("s-j" . corfu-quick-complete))
   :init
   ;; Enable Corfu
@@ -709,6 +689,7 @@ otherwise insert the char literally (closing the unbalanced list)."
                         (list #'cape-dabbrev #'cape-file #'cape-abbrev))))
 
 (use-package completion-preview
+  :if (>= emacs-major-version 30)
   :ensure nil
   :bind (:map completion-preview-active-mode-map
               ("M-f" . #'completion-preview-insert-word)
@@ -745,7 +726,7 @@ otherwise insert the char literally (closing the unbalanced list)."
 ;; https://github.com/emacsmirror/dired-plus
 (use-package dired+
   :disabled t
-  :ensure (dired-plus :type git :host github repo: "emacsmirror/dired-plus")
+  :ensure (dired-plus :type git :host github :repo "emacsmirror/dired-plus")
   :after dired
   :bind
   (:map dired-mode-map
@@ -784,7 +765,13 @@ otherwise insert the char literally (closing the unbalanced list)."
   ("M-i" . change-inner)
   ;("M-o" . change-outer)
   :config
-  (advice-add 'change-inner* :around #'delete-region-instead-of-kill-region))
+  (require 'cl-lib)
+  (defun jl/delete-region-instead-of-kill-region (orig-fn &rest args)
+    "Call ORIG-FN with `kill-region' temporarily acting as `delete-region'."
+    (cl-letf (((symbol-function 'kill-region)
+               (lambda (beg end &optional _region) (delete-region beg end))))
+      (apply orig-fn args)))
+  (advice-add 'change-inner* :around #'jl/delete-region-instead-of-kill-region))
 
 (use-package symbol-overlay
   :ensure t
@@ -799,7 +786,12 @@ otherwise insert the char literally (closing the unbalanced list)."
 
 
 ;; show available keybindings after you start typing
-(which-key-mode)
+;; which-key is built in from Emacs 30; install it only on older versions.
+(if (< emacs-major-version 30)
+    (use-package which-key
+      :ensure t
+      :config (which-key-mode))
+  (which-key-mode))
 
 (use-package discover-my-major
   :ensure t
@@ -811,7 +803,8 @@ otherwise insert the char literally (closing the unbalanced list)."
   :custom
   (vundo-glyph-alist vundo-unicode-symbols)
   (vundo-roll-back-on-quit nil)
-  :bind (("C-z" . 'undo)))
+  :bind (("C-z" . undo)
+         ("C-x u" . vundo)))
 
 (use-package find-file-in-project
   :ensure t
@@ -827,9 +820,18 @@ otherwise insert the char literally (closing the unbalanced list)."
   (flycheck-checker-error-threshold 1605)
   (flycheck-check-syntax-automatically '(save))
   (flycheck-mode-line-prefix "FC")
+  :preface
+  (defun jl/flycheck-off-in-eglot ()
+    "Leave diagnostics to eglot's flymake while eglot manages the buffer."
+    (if (eglot-managed-p)
+        (flycheck-mode -1)
+      (when (derived-mode-p 'prog-mode)
+        (flycheck-mode 1))))
   :config
   (add-to-list 'flycheck-disabled-checkers 'ruby-reek)
-  :hook (prog-mode . flycheck-mode))
+  :hook
+  (prog-mode . flycheck-mode)
+  (eglot-managed-mode . jl/flycheck-off-in-eglot))
 
 ;; (use-package casual-symbol-overlay
 ;;   :ensure t
@@ -843,7 +845,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   :if (executable-find "clang-tidy")
   :custom (flycheck-clang-tidy-build-path "../../build")
   :after (flycheck)
-  :hook (c++-mode . flycheck-clang-tidy-setup)
+  :hook ((c++-mode c++-ts-mode) . flycheck-clang-tidy-setup)
   )
 
 ;; (use-package envrc
@@ -890,17 +892,29 @@ otherwise insert the char literally (closing the unbalanced list)."
   :config
   ; (add-to-list 'inf-ruby-implementations '("ruby" . "irb --prompt default --noreadline -r irb/completion"))
   (setq inf-ruby-default-implementation "ruby")
-  :hook (ruby-mode . inf-ruby-minor-mode))
+  :hook ((ruby-mode ruby-ts-mode) . inf-ruby-minor-mode))
 
-(use-package treesit
-  :config
-  (add-to-list 'treesit-extra-load-path (expand-file-name "treesit" user-emacs-directory)))
-
-(use-package treesit-auto
-  :ensure t
-  :config
-  (treesit-auto-add-to-auto-mode-alist)
-  (global-treesit-auto-mode))
+;; Tree-sitter modes.  Grammars are found in ~/.emacs.d/tree-sitter/
+;; (always searched) and var/treesit/ (added by no-littering).
+;;
+;; Emacs 31+: built in, new grammars go to var/treesit/.  Plain `ask' is
+;; set on purpose: no-littering would otherwise switch it to `ask-dir',
+;; which also prompts for a directory.  Every -ts- mode replaces its classic mode, and
+;; the first time a file needs a missing grammar, Emacs asks whether to
+;; download and compile it (requires git and a C compiler).  Declining
+;; leaves that buffer without a working mode; to keep a language on its
+;; classic mode, change `t' to a list of the -ts- modes you want.
+;;
+;; Emacs 29/30: treesit-auto, which only switches when the grammar is
+;; already installed.  Note that it takes about 2.4 s at startup.
+(if (>= emacs-major-version 31)
+    (setopt treesit-auto-install-grammar 'ask
+            treesit-enabled-modes t)
+  (use-package treesit-auto
+    :ensure t
+    :config
+    (treesit-auto-add-to-auto-mode-alist)
+    (global-treesit-auto-mode)))
 
 (use-package treesit-fold
   :ensure (treesit-fold :type git :host github :repo "emacs-tree-sitter/treesit-fold"))
@@ -913,19 +927,25 @@ otherwise insert the char literally (closing the unbalanced list)."
                                                  ("ty" "server")
                                                  ("pyright-langserver" "--stdio")))))
  :hook
- (typescript-ts-mode . eglot-ensure)
- (js-ts-mode . eglot-ensure)
- (ruby-ts-mode . eglot-ensure)
+ ;; Hook both the classic and the -ts- mode: a -ts- mode never runs the
+ ;; classic mode's hook.  Python has a shared parent in Emacs 29+.
+ ((typescript-ts-mode tsx-ts-mode) . eglot-ensure)
+ ((js-mode js-ts-mode) . eglot-ensure)
  (json-ts-mode . eglot-ensure)
- (yaml-ts-mode . eglot-ensure)
+ ((yaml-mode yaml-ts-mode) . eglot-ensure)
  (dockerfile-ts-mode . eglot-ensure)
- (css-mode . eglot-ensure)
- (python-mode . eglot-ensure)
+ ((css-mode css-ts-mode) . eglot-ensure)
+ (python-base-mode . eglot-ensure)
  (html-mode . eglot-ensure))
 
 (use-package breadcrumb
   :ensure t
-  :commands (breadcrumb-mode)
+  :commands (breadcrumb-mode breadcrumb-local-mode)
+  :hook (eglot-managed-mode . jl/breadcrumb-follow-eglot)
+  :init
+  (defun jl/breadcrumb-follow-eglot ()
+    "Enable `breadcrumb-local-mode' while Eglot manages the buffer."
+    (breadcrumb-local-mode (if (eglot-managed-p) 1 -1)))
   :config
   (setq which-func-functions #'(breadcrumb-imenu-crumbs))
 )
@@ -937,40 +957,53 @@ otherwise insert the char literally (closing the unbalanced list)."
   :config
   (use-package smartparens-ruby)
   :hook
-  (ruby-mode . subword-mode)
-  (ruby-mode . eglot-ensure)
+  ((ruby-mode ruby-ts-mode) . subword-mode)
+  ((ruby-mode ruby-ts-mode) . eglot-ensure)
   :interpreter "ruby"
-  :bind
-  (([(meta down)] . forward-sexp)
-   ([(meta up)]   . backward-sexp)
-   (("C-c C-e"    . ruby-send-region)))
+  :bind (:map ruby-mode-map ("C-c C-e" . ruby-send-region))
   )
+
+(with-eval-after-load 'ruby-ts-mode
+  (keymap-set ruby-ts-mode-map "C-c C-e" #'ruby-send-region))
 
 (use-package yard-mode
   :ensure t
   :diminish yard-mode
   :after ruby-mode
-  :hook ruby-mode)
+  :hook (ruby-mode ruby-ts-mode))
 
 (use-package ruby-tools
   :ensure t
   :commands ruby-tools-mode
-  :hook (ruby-mode . ruby-tools-mode)
+  :hook ((ruby-mode ruby-ts-mode) . ruby-tools-mode)
   :diminish ruby-tools-mode)
 
 
+;; Markdown: gfm-mode (from markdown-mode) on Emacs 29/30, the built-in
+;; markdown-ts-mode on Emacs 31.  markdown-mode stays installed on 31
+;; too, since eglot renders hover documentation with `gfm-view-mode'.
 (use-package markdown-mode
-  :disabled t
+  :ensure t
   :custom (markdown-fontify-code-block-natively t)
   :mode (("\\.md\\'" . gfm-mode)
-         ("\\.markdown\\'" . gfm-mode))
-  )
+         ("\\.markdown\\'" . gfm-mode)))
 
-(use-package markdown-ts-mode
-  :ensure nil
-  :mode (("\\.md\\'" . gfm-mode)
-         ("\\.markdown\\'" . gfm-mode))
-  :defer t)
+;; Emacs 31: markdown-ts-mode is built in but not enabled by default (it
+;; is still marked experimental), and `treesit-enabled-modes' doesn't
+;; cover it.  Without the markdown grammars, Emacs asks to install them
+;; and otherwise falls back to text-mode with a warning.
+(when (>= emacs-major-version 31)
+  (use-package markdown-ts-mode
+    :ensure nil
+    :mode ("\\.md\\'" "\\.mdx\\'" "\\.markdown\\'")
+    :init
+    ;; markdown-mode's autoloads (loaded by elpaca after init) put their
+    ;; own .md/.mdx entry ahead of the ones above, and the markdown-mode
+    ;; block maps .md to gfm-mode.  Remap both so they still end up here.
+    (add-to-list 'major-mode-remap-alist '(markdown-mode . markdown-ts-mode))
+    (add-to-list 'major-mode-remap-alist '(gfm-mode . markdown-ts-mode))
+    :config
+    (require 'markdown-ts-mode-x)))
 
 (use-package yaml-mode
   :ensure t
@@ -1000,9 +1033,6 @@ otherwise insert the char literally (closing the unbalanced list)."
   :custom (web-mode-css-indent-offset 2)
   :config
   (add-to-list 'auto-mode-alist '("\\.html?\\'" . web-mode))
-  (setq web-mode-ac-sources-alist
-        '(("css" . (ac-source-css-property))
-          ("html" . (ac-source-words-in-buffer ac-source-abbrev))))
   (setq web-mode-enable-auto-closing t)
   (setq web-mode-tag-auto-close-style 2)
   (setq web-mode-enable-auto-quoting t)
@@ -1018,7 +1048,7 @@ otherwise insert the char literally (closing the unbalanced list)."
 (use-package jsonian
   :ensure t
   :after so-long
-  :custom
+  :config
   (jsonian-no-so-long-mode)
   :hook (flycheck-mode . jsonian-enable-flycheck)
   )
@@ -1046,18 +1076,16 @@ otherwise insert the char literally (closing the unbalanced list)."
   :init (setq whitespace-line-column 80))
 ;  :hook (asm-mode . whitespace-mode)
 
-(require 'ansi-color)
-(defun colorize-compilation-buffer ()
-  "Support for ansi colors in comint buffers."
-  (read-only-mode)
-  (ansi-color-apply-on-region compilation-filter-start (point))
-  (read-only-mode))
-(add-hook 'compilation-filter-hook 'colorize-compilation-buffer)
+;; ANSI colours in compilation buffers
+(add-hook 'compilation-filter-hook #'ansi-color-compilation-filter)
 
-(setq gud-gdb-command-name "gdb-multiarch -i=mi --annotate=1")
+;; --annotate is not needed with the MI interpreter
+(when (executable-find "gdb-multiarch")
+  (setq gud-gdb-command-name "gdb-multiarch -i=mi"))
 
 (use-package asm-mode
-  :custom (tab-width 8)
+  ;; Not `:custom (tab-width 8)': that changes the global default.
+  :hook (asm-mode . (lambda () (setq-local tab-width 8)))
   ;:config (setq asm-comment-char ?#)
 )
 
@@ -1080,24 +1108,27 @@ otherwise insert the char literally (closing the unbalanced list)."
   ;;:load-path "lisp/arm-mode"
   :mode ("\\.i\\'" "\\.s\\'")
   :config (setq asm-comment-char ?\;)
-  :bind (:map arm-mode-map
-              ("M-." . xref-posframe-dwim)
-              ("M-," . xref-posframe-pop)))
+  ;; Re-add once lisp/xref-posframe exists again:
+  ;; :bind (:map arm-mode-map
+  ;;             ("M-." . xref-posframe-dwim)
+  ;;             ("M-," . xref-posframe-pop))
+  )
 
 (defun jl/c-mode-common-hook ()
   (require 'smartparens-c)
-  (setq-default fill-column 79)
-  (setq-default display-fill-column-indicator-column 79)
+  (setq-local fill-column 79)
+  (setq-local display-fill-column-indicator-column 79)
   (display-fill-column-indicator-mode)
   )
 
 (use-package hideif
   :diminish hide-ifdef-mode
   :custom (hide-ifdef-shadow 't)
-  :hook (c-mode-common . hide-ifdef-mode)
+  :hook ((c-mode-common c-ts-base-mode) . hide-ifdef-mode)
   )
 
 (add-hook 'c-mode-common-hook #'jl/c-mode-common-hook)
+(add-hook 'c-ts-base-mode-hook #'jl/c-mode-common-hook)
 
 ;; FIX prevent bug in smartparens
 ;; (setq sp-escape-quotes-after-insert nil)
@@ -1109,28 +1140,35 @@ otherwise insert the char literally (closing the unbalanced list)."
                ("C-c C-o" . ff-find-other-file))
   :config
   (setq c-default-style "k&r"
-        c-basic-offset 2))
+        c-basic-offset 2)
+  (keymap-set c++-mode-map "<remap> <kill-sexp>" #'sp-kill-hybrid-sexp))
 
 (use-package sqlite-mode
   :ensure nil
   :mode "\\.db\\'"
   )
 
-(use-package c++-ts-mode
+;; c-ts-mode.el defines both c-ts-mode and c++-ts-mode; there is no
+;; separate c++-ts-mode feature.
+(use-package c-ts-mode
   :ensure nil
-  :after smartparens
-  :bind
-  ([remap kill-sexp] . sp-kill-hybrid-sexp)
-  (:map c++-ts-mode-map
-        ("C-c C-o" . ff-find-other-file))
+  :defer t
+  :custom
+  ;; match the cc-mode style below
+  (c-ts-mode-indent-style 'k&r)
+  (c-ts-mode-indent-offset 2)
   :hook
-  (c++-mode . jl/c++-mode-hook)
-  (c++-mode . eglot-ensure)
-  )
+  ((c++-mode c++-ts-mode) . jl/c++-mode-hook)
+  ((c++-mode c++-ts-mode) . eglot-ensure)
+  :config
+  (dolist (map (list c-ts-mode-map c++-ts-mode-map))
+    (keymap-set map "C-c C-o" #'ff-find-other-file))
+  (keymap-set c++-ts-mode-map "<remap> <kill-sexp>" #'sp-kill-hybrid-sexp)
+  (keymap-set c++-ts-mode-map "C-c f" #'clang-format-region))
 
 (use-package modern-cpp-font-lock
-  :after c++-mode
-  :ensure t)
+  :ensure t
+  :hook (c++-mode . modern-c++-font-lock-mode))
 
 
 (use-package mark-thing-at
@@ -1206,7 +1244,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   (("M-<up>"    . move-text-up)
    ("M-<down>"  . move-text-down)))
 
-;; edit grep-buffers, e.g., ivy-occur
+;; edit grep buffers, e.g. from embark-export of consult-ripgrep
 (use-package wgrep
   :ensure t
   )
@@ -1214,29 +1252,21 @@ otherwise insert the char literally (closing the unbalanced list)."
 (use-package ws-butler
   :ensure t
   :custom
-  (ws-butler-keep-whitespace-before- nil)
+  (ws-butler-keep-whitespace-before-point nil)
   :diminish ""
   :config
   (ws-butler-global-mode)
 )
 
-(defun jl/el-mode-hook ()
-  (message "el-mode-hook")
-  (smartparens-strict-mode +1)
-  (rainbow-delimiters-mode +1)
-  )
-
+;; smartparens-strict-mode and rainbow-delimiters are enabled for elisp
+;; by the smartparens and rainbow-delimiters blocks.
 (use-package lisp-mode
   :ensure nil
   :diminish "L"
-:bind
+  :bind
   (:map emacs-lisp-mode-map
         ("C-c C-c" . eval-defun)
-        ("C-c C-b" . eval-buffer))
-  :hook  ((emacs-lisp-mode . jl/el-mode-hook)
-          ;;((eval-expression-minibuffer-setup lisp-interaction-mode emacs-lisp-mode) . eldoc-mode)
-          )
-  )
+        ("C-c C-b" . eval-buffer)))
 
 (use-package request
   :ensure t
@@ -1270,7 +1300,11 @@ otherwise insert the char literally (closing the unbalanced list)."
   :ensure (arm-lookup :type git :host github :repo "jonatanlinden/arm-lookup")
   :after arm-mode
   :custom
-  (arm-lookup-browse-pdf-function 'arm-lookup-browse-pdf-sumatrapdf)
+  ;; SumatraPDF only exists on Windows; elsewhere use the package
+  ;; default, which tries the available viewers in turn
+  (arm-lookup-browse-pdf-function (if *is-win*
+                                      #'arm-lookup-browse-pdf-sumatrapdf
+                                    #'arm-lookup-browse-pdf-any))
   :bind (:map arm-mode-map ("C-M-." . arm-lookup))
   )
 
@@ -1295,8 +1329,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   :ensure t
   :custom (org-mru-clock-how-many 10)
   :bind* (("<f8>" . org-mru-clock-in))
-  :commands (org-mru-clock-in org-mru-clock-select-recent-task)
-  :config (add-hook 'minibuffer-setup-hook #'org-mru-clock-embark-minibuffer-hook))
+  :commands (org-mru-clock-in org-mru-clock-select-recent-task))
 
 (setq visual-line-fringe-indicators '(left-curly-arrow right-curly-arrow))
 
@@ -1306,7 +1339,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   :after ox
   )
 
-(csetq ffap-machine-p-known 'reject)
+(setopt ffap-machine-p-known 'reject)
 
 (use-package alert
   :if window-system
@@ -1326,22 +1359,22 @@ otherwise insert the char literally (closing the unbalanced list)."
 
 (use-package rust-mode
   :ensure t
-  :hook (rust-mode . eglot-ensure))
+  :hook ((rust-mode rust-ts-mode) . eglot-ensure))
 
 ;; Add keybindings for interacting with Cargo
 (use-package cargo
   :ensure t
-  :hook (rust-mode . cargo-minor-mode))
+  :hook ((rust-mode rust-ts-mode) . cargo-minor-mode))
 
 (use-package flycheck-rust
-  :after rust
+  :after rust-mode
   :ensure t
   :hook (flycheck-mode . flycheck-rust-setup))
 
 
 (use-package ninja-mode
   :mode ("\\.ninja\\'")
-  :ensure (ninja-mode :type git :host github repo: "ninja-build/ninja-emacs"))
+  :ensure t)
 
 
 (use-package multiple-cursors
@@ -1356,14 +1389,23 @@ otherwise insert the char literally (closing the unbalanced list)."
   (setq fill-column 72)
   (turn-on-auto-fill))
 
-(use-package transient :ensure t)
+(use-package transient
+  :ensure t
+  :config (transient-bind-q-to-quit))
 
 (use-package magit
   :after transient
   :ensure t
   :custom (magit-section-initial-visibility-alist '((stashes . hide) (untracked . hide)))
-          (magit-disable-section-inserter 'magit-insert-tags-header)
   :config
+          (defun jl/magit-display-buffer (buffer)
+            "Show Magit status in the same window when called from Dired."
+            (if (and (derived-mode-p 'dired-mode)
+                     (with-current-buffer buffer
+                       (derived-mode-p 'magit-status-mode)))
+                (display-buffer buffer '(display-buffer-same-window))
+              (magit-display-buffer-traditional buffer)))
+          (setq magit-display-buffer-function #'jl/magit-display-buffer)
           (remove-hook 'magit-status-headers-hook 'magit-insert-tags-header)
           (add-hook 'magit-status-sections-hook #'magit-insert-worktrees t)
   :bind (("C-x g" . magit-status)
@@ -1382,15 +1424,10 @@ otherwise insert the char literally (closing the unbalanced list)."
   :ensure t
   :hook (magit-mode . magit-delta-mode))
 
-;; Transient commands: replaces the old magit-popup
-(use-package transient :defer t
-  :config (transient-bind-q-to-quit))
-
 ;; git-messenger: popup commit message at current line
 ;; https://github.com/syohex/emacs-git-messenger
 (use-package git-messenger
   :ensure t
-  :custom (git-messenger:use-magit-popup t)
   :bind
   (("C-c g m" . git-messenger:popup-message)
    :map git-messenger-map
@@ -1438,22 +1475,18 @@ otherwise insert the char literally (closing the unbalanced list)."
   :hook
   (ediff-before-setup . store-pre-ediff-winconfig)
   (ediff-quit . restore-pre-ediff-winconfig)
-  (ediff-startup . (lambda () (ws-butler-mode nil)))
+  (ediff-startup . (lambda () (ws-butler-mode -1)))
   )
 
 (use-package dumb-jump
   :ensure t
-  :custom
-  (dumb-jump-selector 'ivy)
+  :init
+  ;; Use dumb-jump as an xref backend (M-.), as a fallback after
+  ;; buffer-local backends such as eglot's.
+  (with-eval-after-load 'xref
+    (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
   :config
-  (add-to-list 'dumb-jump-language-file-exts '(:language "c++" :ext "tg" :agtype "cc" :rgtype "c"))
-  ;;(require 'xref)
-  ;;(setq xref-backend-functions (remq 'etags--xref-backend xref-backend-functions))
-  ;;(add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
-  ;; (add-to-list'xref-backend-functions #'dumb-jump-xref-activate)
-  :hook (prog-mode . (lambda () (add-to-list'xref-backend-functions #'dumb-jump-xref-activate)))
-  :hook (prog-mode . dumb-jump-mode)
-  )
+  (add-to-list 'dumb-jump-language-file-exts '(:language "c++" :ext "tg" :agtype "cc" :rgtype "c")))
 
 (defun jl/comment-box (b e)
 "Draw a box comment around the region but arrange for the region
@@ -1479,23 +1512,28 @@ otherwise insert the char literally (closing the unbalanced list)."
 ;;; in bat mode, treat _ as a word constitutent
 (add-hook 'bat-mode-hook #'(lambda () (modify-syntax-entry ?_ "w")))
 
-(windmove-default-keybindings 'control)
+;; super+arrows: C-<left>/C-<right> belong to smartparens slurp/barf
+(windmove-default-keybindings 'super)
 ;; numbered window shortcuts
 (use-package winum
   :ensure t
-  :defer t
   :config
   (winum-mode))
 
+;; xref-posframe and xref-asm are disabled because lisp/xref-posframe
+;; and lisp/xref-asm no longer exist.  Restore them, then remove `:disabled'.
 (use-package posframe
+  :disabled t
   :after xref-posframe
   :ensure t)
 
 (use-package xref-posframe
+  :disabled t
   :after xref-asm
   :load-path "lisp/xref-posframe")
 
 (use-package xref-asm
+  :disabled t
   :load-path "lisp/xref-asm"
   :after arm-mode
   :config
@@ -1513,8 +1551,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   )
 
 (use-package nxml-mode
-  :mode ("\\.xml\\'")
-  :config (setq show-smartparens-mode -1))
+  :mode ("\\.xml\\'"))
 
 (use-package point-history
   :disabled t
@@ -1535,18 +1572,19 @@ otherwise insert the char literally (closing the unbalanced list)."
          ;; ("C-c C-j" . lsp-find-definition)
          ;; ("C-c C-d" . lsp-describe-thing-at-point)
          )
-  :hook ((go-mode . eglot-ensure)))
+  :hook (((go-mode go-ts-mode) . eglot-ensure)))
 
 (use-package csv-mode
   :ensure t
   :mode ("\\.csv\\'")
   :hook (csv-mode . csv-guess-set-separator))
 
-(use-package js2-mode
-  :ensure t
-  :mode("\\.js\\'")
-  :custom (js2-basic-offset 2)
-  )
+;; Built-in js-mode (js-ts-mode on Emacs 31) instead of js2-mode, so
+;; eglot and tree-sitter apply to .js files.
+(use-package js
+  :ensure nil
+  :defer t
+  :custom (js-indent-level 2))
 
 
 (defun command-line-diff (switch)
@@ -1570,31 +1608,24 @@ otherwise insert the char literally (closing the unbalanced list)."
  :description "Move to previous mark")
 
 (cheatsheet-add
- :group 'Ivy-occur
- :key "C-o"
- :description "Open file at location from an ivy-occur buffer")
-
-(cheatsheet-add
- :group 'Swiper
- :key "M-j"
- :description "Insert word-at-point into the minibuffer. Extend by pressing multiple times")
-
-(cheatsheet-add
- :group 'Swiper
+ :group 'Consult
  :key "M-n"
- :description "Insert symbol-at-point into the minibuffer")
+ :description "In consult-line/consult-ripgrep: insert symbol at point (future history)")
 
 (cheatsheet-add
- :group 'Swiper
- :key "M-q"
- :description "Query replace")
-
+ :group 'Embark
+ :key "C-. E"
+ :description "Export candidates to a buffer (e.g. consult-ripgrep -> grep buffer)")
 
 (cheatsheet-add
- :group 'Swiper
- :key "M-o i"
- :description "Insert current ivy/swiper/counsel match into the current buffer"
- )
+ :group 'Embark
+ :key "C-c C-p"
+ :description "In an exported grep buffer: edit the matches with wgrep, C-c C-c to save")
+
+(cheatsheet-add
+ :group 'Embark
+ :key "C-. i"
+ :description "Insert the current candidate into the buffer")
 
 (cheatsheet-add
  :group 'General
