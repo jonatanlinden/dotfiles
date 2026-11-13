@@ -28,6 +28,11 @@
 (require 'seq)
 (require 'magit)
 
+(defconst jl/magit--ref-lookup-order
+  '("%s" "refs/%s" "refs/tags/%s" "refs/heads/%s"
+    "refs/remotes/%s" "refs/remotes/%s/HEAD")
+  "Where git looks for a short ref name, in order (gitrevisions(7)).")
+
 (defvar-local jl/magit--untracked-set nil
   "Non-nil if the prefill made `magit-status-show-untracked-files' local.")
 
@@ -44,24 +49,24 @@
       (cl-incf (cdar magit--refresh-cache))
       (push (cons key value) (cdr magit--refresh-cache)))))
 
+(defun jl/magit--cached (args)
+  "Value cached for ARGS in `default-directory', or nil."
+  (and magit--refresh-cache
+       (cdr (assoc (cons default-directory args) (cdr magit--refresh-cache)))))
+
 (defun jl/magit--ref-table ()
   "Ref name -> object id for this refresh, or nil when not prefilled."
-  (and magit--refresh-cache
-       (cdr (assoc (cons default-directory 'jl/ref-table)
-                   (cdr magit--refresh-cache)))))
+  (jl/magit--cached 'jl/ref-table))
 
 (defun jl/magit--resolve (table name)
   "Object id that short ref NAME resolves to in TABLE, by git's lookup order."
   (seq-some (lambda (fmt) (gethash (format fmt name) table))
-            '("%s" "refs/%s" "refs/tags/%s" "refs/heads/%s"
-              "refs/remotes/%s" "refs/remotes/%s/HEAD")))
+            jl/magit--ref-lookup-order))
 
 (defun jl/magit--rev-ancestor-from-track (orig a b)
   "Answer `magit-rev-ancestor-p' (ORIG) for HEAD vs. upstream from the prefill.
 A and B are the commits; anything else falls through to ORIG."
-  (let ((known (and magit--refresh-cache (equal a "HEAD")
-                    (cdr (assoc (cons default-directory 'jl/head-vs-upstream)
-                                (cdr magit--refresh-cache))))))
+  (let ((known (and (equal a "HEAD") (jl/magit--cached 'jl/head-vs-upstream))))
     (if (and known (equal b (car known)))
         (cdr known)
       (funcall orig a b))))
@@ -83,6 +88,72 @@ Uses the ref table; anything else falls through to ORIG."
         (gethash rev table)
       (funcall orig rev))))
 
+(defun jl/magit--sync-untracked-setting ()
+  "Make `magit-status-show-untracked-files' buffer-local `no' per git config.
+Magit otherwise asks `git config --local' (never cached) on every
+refresh.  Decided from the config list magit loads anyway.  Unlike
+magit, this also honours a global status.showUntrackedFiles=no."
+  (let ((off (member (magit-get "status.showUntrackedFiles")
+                     '("no" "off" "false" "0"))))
+    (cond ((local-variable-p 'jl/magit--untracked-set)
+           (unless off
+             (kill-local-variable 'magit-status-show-untracked-files)
+             (kill-local-variable 'jl/magit--untracked-set)))
+          ((and off (not (local-variable-p 'magit-status-show-untracked-files)))
+           (setq-local magit-status-show-untracked-files 'no
+                       jl/magit--untracked-set t)))))
+
+(defun jl/magit--prefill-status (table branch upstream track)
+  "Prefill what only status buffers ask for.
+TABLE is the ref table, BRANCH the current branch (nil if detached or
+ambiguous), UPSTREAM its upstream and TRACK its %(upstream:track)."
+  ;; HEAD is an ancestor of its upstream iff it isn't ahead of it.
+  (when upstream
+    (jl/magit--cache-put 'jl/head-vs-upstream
+                         (cons upstream (not (string-match-p "ahead" track)))))
+  ;; Push target ("Push:" header).  `magit-get' reads the config list
+  ;; magit would load anyway, so this costs no extra process.
+  (let* ((push-target
+          (and-let* ((branch)
+                     (remote (or (magit-get "branch" branch "pushRemote")
+                                 (magit-get "remote.pushDefault"))))
+            (concat remote "/" branch)))
+         (push-oid (and push-target (jl/magit--resolve table push-target))))
+    (when push-target
+      (jl/magit--cache-put (list "rev-parse" "--verify" push-target) push-oid))
+    ;; 2. Repository paths and the commits the status buffer looks at.
+    ;;    Fails (and is skipped) in repos with fewer than 11 commits.
+    (when-let* ((lines (jl/magit--git-lines
+                        "rev-parse" "--show-toplevel" "--git-dir"
+                        "--is-bare-repository" "HEAD" "HEAD~" "HEAD~10")))
+      (pcase-let ((`(,top ,gitdir ,bare ,head ,head1 ,head10) lines))
+        (jl/magit--cache-put '("rev-parse" "--show-toplevel") top)
+        (jl/magit--cache-put '("rev-parse" "--git-dir") gitdir)
+        (jl/magit--cache-put '("rev-parse" "--is-bare-repository")
+                             (concat bare "\n"))
+        (jl/magit--cache-put '("rev-parse" "--verify" "HEAD~10") head10)
+        ;; 3. Short hashes and subjects, in one log call.
+        (let* ((up-oid (and upstream (jl/magit--resolve table upstream)))
+               (info (make-hash-table :test #'equal)))
+          (dolist (line (apply #'jl/magit--git-lines
+                               "log" "--no-walk=unsorted" "--format=%H%x00%h%x00%s"
+                               (delete-dups (delq nil (list head head1 up-oid push-oid)))))
+            (pcase-let ((`(,oid ,short ,subject) (split-string line "\0")))
+              (puthash oid (cons short subject) info)))
+          (pcase-dolist (`(,rev . ,oid) `(("HEAD" . ,head) ("HEAD~" . ,head1)))
+            (when-let* ((h (gethash oid info)))
+              (jl/magit--cache-put (list "rev-parse" "--short" rev) (car h))))
+          (when-let* ((h (gethash head info)))
+            (jl/magit--cache-put
+             '("log" "--no-walk" "--format=%h %s" "HEAD^{commit}" "--")
+             (concat (car h) " " (cdr h))))
+          (pcase-dolist (`(,name . ,oid) `((,upstream . ,up-oid)
+                                           (,push-target . ,push-oid)))
+            (when-let* ((h (and oid (gethash oid info))))
+              (jl/magit--cache-put
+               (list "log" "--no-walk" "--format=%s" (concat name "^{commit}") "--")
+               (cdr h)))))))))
+
 (defun jl/magit-prefill-status-cache ()
   "Prefill `magit--refresh-cache' with cheap lookups for a status refresh.
 In log and revision buffers only the ref table (plus current branch and
@@ -90,31 +161,16 @@ its upstream) is built: it answers the per-decoration \"is there a tag
 with this branch's name\" checks (~40 per log)."
   (when-let* ((magit--refresh-cache)
               ((zerop (recursion-depth)))
-              ((derived-mode-p 'magit-status-mode 'magit-log-mode
-                               'magit-revision-mode))
-              ;; Once per refresh.
-              ((not (assoc (cons default-directory 'jl/ref-table)
-                           (cdr magit--refresh-cache))))
               (kind (cond ((derived-mode-p 'magit-status-mode) 'status)
                           ((derived-mode-p 'magit-revision-mode) 'revision)
-                          ('log))))
-    ;; 0. Untracked files: magit asks `git config --local' (never cached)
-    ;;    on every refresh unless `magit-status-show-untracked-files' is
-    ;;    buffer-local.  Decide from the config list magit loads anyway.
-    ;;    Unlike magit, this also honours a global showUntrackedFiles=no.
-    (cond ((not (eq kind 'status)))
-          ((local-variable-p 'jl/magit--untracked-set)
-           (unless (member (magit-get "status.showUntrackedFiles")
-                           '("no" "off" "false" "0"))
-             (kill-local-variable 'magit-status-show-untracked-files)
-             (kill-local-variable 'jl/magit--untracked-set)))
-          ((and (not (local-variable-p 'magit-status-show-untracked-files))
-                (member (magit-get "status.showUntrackedFiles")
-                        '("no" "off" "false" "0")))
-           (setq-local magit-status-show-untracked-files 'no)
-           (setq-local jl/magit--untracked-set t)))
+                          ((derived-mode-p 'magit-log-mode) 'log)))
+              ;; Once per refresh (the table may be stored as nil).
+              ((not (assoc (cons default-directory 'jl/ref-table)
+                           (cdr magit--refresh-cache)))))
+    (when (eq kind 'status)
+      (jl/magit--sync-untracked-setting))
     (let ((table (make-hash-table :test #'equal))
-          head-branch upstream head-track push-target push-oid)
+          head-branch upstream head-track)
       ;; 1. All refs, with symref targets and upstreams.
       (dolist (line (jl/magit--git-lines
                      "for-each-ref" "--include-root-refs"
@@ -122,7 +178,7 @@ with this branch's name\" checks (~40 per log)."
         (pcase-let ((`(,ref ,oid ,symref ,up ,track) (split-string line "\0")))
           (puthash ref oid table)
           (when (and (equal ref "HEAD") (string-prefix-p "refs/heads/" symref))
-            (setq head-branch (substring symref 11)))
+            (setq head-branch (string-remove-prefix "refs/heads/" symref)))
           (when (and (string-prefix-p "refs/" ref) (not (equal symref "")))
             (jl/magit--cache-put (list "symbolic-ref" ref) symref))
           (when (and head-branch (equal ref (concat "refs/heads/" head-branch))
@@ -131,79 +187,26 @@ with this branch's name\" checks (~40 per log)."
       ;; The HEAD row sorts first, so the branch row above saw head-branch.
       ;; If a tag (or other ref) shares the branch's name, git shortens it
       ;; to "heads/NAME" and magit uses that; leave all of that to magit.
-      (when (and head-branch
-                 (seq-some (lambda (fmt) (gethash (format fmt head-branch) table))
-                           '("%s" "refs/%s" "refs/tags/%s")))
-        (setq head-branch 'ambiguous upstream nil))
-      (when (gethash "HEAD" table)
-        (push (cons (cons default-directory 'jl/ref-table) table)
-              (cdr magit--refresh-cache))
-        (if (eq head-branch 'ambiguous)
-            (setq head-branch nil)
-          (jl/magit--cache-put '("symbolic-ref" "--short" "HEAD") head-branch))
-        ;; The upstream name is looked up by status and revision buffers,
-        ;; everything after it by status buffers only.
-        (when (eq kind 'log)
-          (setq head-branch nil upstream nil))
-        (when head-branch
-          (jl/magit--cache-put
-           (list "rev-parse" "--verify" "--abbrev-ref"
-                 (concat head-branch "@{upstream}"))
-           upstream))
-        (unless (eq kind 'status)
-          (setq head-branch nil upstream nil))
-        ;; HEAD is an ancestor of its upstream iff it isn't ahead of it.
-        (when upstream
-          (push (cons (cons default-directory 'jl/head-vs-upstream)
-                      (cons upstream (not (string-match-p "ahead" head-track))))
-                (cdr magit--refresh-cache)))
-        ;; Push target ("Push:" header).  `magit-get' reads the config
-        ;; list magit would load anyway, so this costs no extra process.
-        (setq push-target
-              (and-let* ((head-branch)
-                         (remote (or (magit-get "branch" head-branch "pushRemote")
-                                     (magit-get "remote.pushDefault"))))
-                (concat remote "/" head-branch)))
-        (when push-target
-          (setq push-oid (jl/magit--resolve table push-target))
-          (jl/magit--cache-put (list "rev-parse" "--verify" push-target) push-oid))
-        ;; 2. Repository paths and the commits the status buffer looks at.
-        ;;    Fails (and is skipped) in repos with fewer than 11 commits.
-        (when-let* (((eq kind 'status))
-                    (lines (jl/magit--git-lines
-                            "rev-parse" "--show-toplevel" "--git-dir"
-                            "--is-bare-repository" "HEAD" "HEAD~" "HEAD~10")))
-          (pcase-let ((`(,top ,gitdir ,bare ,head ,head1 ,head10) lines))
-            (jl/magit--cache-put '("rev-parse" "--show-toplevel") top)
-            (jl/magit--cache-put '("rev-parse" "--git-dir") gitdir)
-            (jl/magit--cache-put '("rev-parse" "--is-bare-repository")
-                                 (concat bare "\n"))
-            (jl/magit--cache-put '("rev-parse" "--verify" "HEAD~10") head10)
-            ;; 3. Short hashes and subjects, in one log call.
-            (let* ((up-oid (and upstream (jl/magit--resolve table upstream)))
-                   (info (make-hash-table :test #'equal)))
-              (dolist (line (apply #'jl/magit--git-lines
-                                   "log" "--no-walk=unsorted" "--format=%H%x00%h%x00%s"
-                                   (delete-dups (delq nil (list head head1 up-oid push-oid)))))
-                (pcase-let ((`(,oid ,short ,subject) (split-string line "\0")))
-                  (puthash oid (cons short subject) info)))
-              (when-let* ((h (gethash head info)))
-                (jl/magit--cache-put '("rev-parse" "--short" "HEAD") (car h))
-                (jl/magit--cache-put
-                 '("log" "--no-walk" "--format=%h %s" "HEAD^{commit}" "--")
-                 (concat (car h) " " (cdr h))))
-              (when-let* ((h (gethash head1 info)))
-                (jl/magit--cache-put '("rev-parse" "--short" "HEAD~") (car h)))
-              (when-let* ((h (and up-oid (gethash up-oid info))))
-                (jl/magit--cache-put
-                 (list "log" "--no-walk" "--format=%s"
-                       (concat upstream "^{commit}") "--")
-                 (cdr h)))
-              (when-let* ((h (and push-oid (gethash push-oid info))))
-                (jl/magit--cache-put
-                 (list "log" "--no-walk" "--format=%s"
-                       (concat push-target "^{commit}") "--")
-                 (cdr h))))))))))
+      (let* ((ambiguous
+              (and head-branch
+                   (seq-some (lambda (fmt) (gethash (format fmt head-branch) table))
+                             (seq-take jl/magit--ref-lookup-order 3))))
+             (branch (and (not ambiguous) head-branch))
+             (upstream (and branch upstream)))
+        (unless (gethash "HEAD" table)
+          (setq table nil))
+        ;; Stored even when nil, so commit buffers don't retry per ref.
+        (jl/magit--cache-put 'jl/ref-table table)
+        (when table
+          (unless ambiguous
+            (jl/magit--cache-put '("symbolic-ref" "--short" "HEAD") branch))
+          ;; The upstream name is looked up by status and revision buffers.
+          (when (and branch (not (eq kind 'log)))
+            (jl/magit--cache-put
+             (list "rev-parse" "--verify" "--abbrev-ref" (concat branch "@{upstream}"))
+             upstream))
+          (when (eq kind 'status)
+            (jl/magit--prefill-status table branch upstream head-track)))))))
 
 ;;; Worktrees section
 
