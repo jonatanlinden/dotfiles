@@ -86,12 +86,12 @@
 
 ;; Segoe UI is a Windows font, and Cascadia Code isn't installed on the Mac
 (when *is-win*
-  (set-face-font 'default "Cascadia Code 10")
+  (set-face-font 'default "Cascadia Code NF 10")
   (copy-face 'default 'fixed-pitch)
   (set-face-font 'variable-pitch "Segoe UI Semibold-10"))
 
-(cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
-      (*is-linux* (add-to-list 'default-frame-alist '(font . "Cascadia Code 10")))
+(cond (*is-win* (add-to-list 'default-frame-alist '(font . "Cascadia Code NF 10")))
+      (*is-linux* (add-to-list 'default-frame-alist '(font . "Cascadia Code NF 10")))
       (*is-mac* (add-to-list 'default-frame-alist '(font . "SF Mono-13")))
       )
 
