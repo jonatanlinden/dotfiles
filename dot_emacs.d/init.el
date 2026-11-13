@@ -202,6 +202,9 @@
 
 ;; Increase Process Output Buffer for LSP
 (setq read-process-output-max (* 4 1024 1024)) ; 4MB
+;; Bigger pipe buffer for subprocess output on Windows (faster large git output)
+(when (eq system-type 'windows-nt)
+  (setq w32-pipe-buffer-size (* 64 1024)))
 
 (defvar elpaca-installer-version 0.12)
 (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
@@ -1058,6 +1061,7 @@ otherwise insert the char literally (closing the unbalanced list)."
   :ensure t
   :bind (("C-c g n" . diff-hl-next-hunk)
          ("C-c g p" . diff-hl-previous-hunk))
+  :custom (diff-hl-update-async t)      ; don't block Emacs on git calls
   :config (unless (display-graphic-p) (diff-hl-margin-mode))
   ;; Highlight changes to the current file in the fringe
   ;; Highlight changed files in the fringe of Dired
@@ -1396,7 +1400,13 @@ otherwise insert the char literally (closing the unbalanced list)."
 (use-package magit
   :after transient
   :ensure t
-  :custom (magit-section-initial-visibility-alist '((stashes . hide) (untracked . hide)))
+  :custom
+  (magit-section-initial-visibility-alist '((stashes . hide) (untracked . hide)))
+  ;; Performance (monorepo):
+  (magit-refresh-verbose t)                 ; per-section timings in *Messages*; remove when done measuring
+  (magit-refresh-status-buffer nil)         ; don't refresh status in the background
+  (magit-commit-show-diff nil)              ; C-c C-d in the commit message shows it on demand
+  (magit-revision-insert-related-refs nil)  ; skip "contained in" branch/tag lookup
   :config
           (defun jl/magit-display-buffer (buffer)
             "Show Magit status in the same window when called from Dired."
@@ -1407,11 +1417,21 @@ otherwise insert the char literally (closing the unbalanced list)."
               (magit-display-buffer-traditional buffer)))
           (setq magit-display-buffer-function #'jl/magit-display-buffer)
           (remove-hook 'magit-status-headers-hook 'magit-insert-tags-header)
-          (add-hook 'magit-status-sections-hook #'magit-insert-worktrees t)
+          (remove-hook 'magit-status-sections-hook 'magit-insert-unpushed-to-pushremote)
+          (remove-hook 'magit-status-sections-hook 'magit-insert-unpulled-from-pushremote)
+          ;; No git notes in use; saves one git call per opened commit.
+          (remove-hook 'magit-revision-sections-hook 'magit-insert-revision-notes)
   :bind (("C-x g" . magit-status)
          ("C-c g l" . magit-list-repositories)
          )
 )
+
+;; Fewer git processes per magit refresh (cache prefill, fast worktrees
+;; section): see lisp/jl-magit-prefill.el.
+(use-package jl-magit-prefill
+  :ensure nil
+  :load-path "lisp"
+  :after magit)
 
 
 ; (use-package forge
@@ -1505,10 +1525,6 @@ otherwise insert the char literally (closing the unbalanced list)."
   (goto-char e)
   (set-marker e nil)))
 
-
-
-
-
 ;;; in bat mode, treat _ as a word constitutent
 (add-hook 'bat-mode-hook #'(lambda () (modify-syntax-entry ?_ "w")))
 
@@ -1520,21 +1536,22 @@ otherwise insert the char literally (closing the unbalanced list)."
   :config
   (winum-mode))
 
-;; xref-posframe and xref-asm are disabled because lisp/xref-posframe
-;; and lisp/xref-asm no longer exist.  Restore them, then remove `:disabled'.
 (use-package posframe
-  :disabled t
-  :after xref-posframe
   :ensure t)
 
+(use-package flymake-posframe
+  :ensure (flymake-posframe :type git :host github :repo "Ladicle/flymake-posframe")
+  :custom (flymake-posframe-error-prefix "\uf071 ")
+  :hook (flymake-mode . flymake-posframe-mode)
+)
+
 (use-package xref-posframe
-  :disabled t
-  :after xref-asm
-  :load-path "lisp/xref-posframe")
+  :load-path "lisp"
+  :after posframe
+  )
 
 (use-package xref-asm
-  :disabled t
-  :load-path "lisp/xref-asm"
+  :load-path "lisp"
   :after arm-mode
   :config
   (xref-asm-activate))
