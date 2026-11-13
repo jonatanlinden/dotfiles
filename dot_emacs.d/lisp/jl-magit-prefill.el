@@ -4,8 +4,7 @@
 
 ;; A magit status refresh starts ~26 git processes; ~15 of them are tiny
 ;; lookups (rev-parse --verify, symbolic-ref, upstream name, subjects, short
-;; hashes).  Process start costs >= 50 ms on this (IT-scanned) Windows
-;; machine, so we answer those from three combined git calls at the start of
+;; hashes).  Answer those from three combined git calls at the start of
 ;; the refresh and put the answers into `magit--refresh-cache' under the
 ;; exact keys magit uses; `magit-rev-verify' on HEAD and full ref names is
 ;; answered from one `for-each-ref' table.  If magit changes its arguments,
