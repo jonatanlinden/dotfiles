@@ -1421,6 +1421,11 @@ otherwise insert the char literally (closing the unbalanced list)."
           (remove-hook 'magit-status-sections-hook 'magit-insert-unpulled-from-pushremote)
           ;; No git notes in use; saves one git call per opened commit.
           (remove-hook 'magit-revision-sections-hook 'magit-insert-revision-notes)
+          ;; Refs buffer (y): local branches only; the monorepo has ~1500
+          ;; remote branches and ~70 tags that are rarely of interest.
+          (with-eval-after-load 'magit-refs
+            (remove-hook 'magit-refs-sections-hook 'magit-insert-remote-branches)
+            (remove-hook 'magit-refs-sections-hook 'magit-insert-tags))
   :bind (("C-x g" . magit-status)
          ("C-c g l" . magit-list-repositories)
          )
@@ -1432,6 +1437,13 @@ otherwise insert the char literally (closing the unbalanced list)."
   :ensure nil
   :load-path "lisp"
   :after magit)
+
+;; M-x jl/magit-resolve-submodule-conflict: resolve a submodule pointer
+;; conflict (e.g. t2-sandbox/base in a rebase) by staging a branch tip.
+(use-package jl-magit-submodule
+  :ensure nil
+  :load-path "lisp"
+  :commands jl/magit-resolve-submodule-conflict)
 
 
 ; (use-package forge
