@@ -278,13 +278,7 @@
 (use-package speedbar
   :ensure nil
   :commands (speedbar)
-  :hook (eglot-managed-mode . jl/speedbar-for-eglot)
-  :init
-  (defun jl/speedbar-for-eglot ()
-    "Open the speedbar when Eglot starts in a git-controlled directory."
-    (when (and (eglot-managed-p)
-               (locate-dominating-file default-directory ".git"))
-      (save-selected-window (speedbar 1))))
+  :bind ("C-c b" . speedbar)
   :custom
   (speedbar-prefer-window t)
   (speedbar-use-images nil)
@@ -1168,7 +1162,13 @@ otherwise insert the char literally (closing the unbalanced list)."
   (dolist (map (list c-ts-mode-map c++-ts-mode-map))
     (keymap-set map "C-c C-o" #'ff-find-other-file))
   (keymap-set c++-ts-mode-map "<remap> <kill-sexp>" #'sp-kill-hybrid-sexp)
-  (keymap-set c++-ts-mode-map "C-c f" #'clang-format-region))
+  (keymap-set c++-ts-mode-map "C-M-TAB" #'clang-format-region))
+
+(use-package clang-format
+  :ensure t
+  :init
+  (setq clang-format-style '"file")
+  (setq clang-format-fallback-style '"LLVM"))
 
 (use-package modern-cpp-font-lock
   :ensure t
@@ -1456,24 +1456,36 @@ otherwise insert the char literally (closing the unbalanced list)."
   :ensure t
   :hook (magit-mode . magit-delta-mode))
 
-;; git-messenger: popup commit message at current line
-;; https://github.com/syohex/emacs-git-messenger
 (use-package git-messenger
   :ensure t
-  :bind
-  (("C-c g m" . git-messenger:popup-message)
-   :map git-messenger-map
-   ([(return)] . git-messenger:popup-close))
+  :bind ("C-x G" . git-messenger:popup-message)
   :config
-  ;; Enable magit-show-commit instead of pop-to-buffer
-  (setq git-messenger:show-detail t))
+  (setq git-messenger:show-detail t
+        git-messenger:use-magit-popup t))
 
-(defun clang-format-defun ()
-  "Run clang-format on the current defun."
-  (interactive)
-  (save-excursion
-    (mark-defun)
-    (clang-format (region-beginning) (region-end))))
+(use-package git-timemachine
+  :ensure t
+  :bind ("C-c t" . git-timemachine))
+
+
+;; git-messenger: popup commit message at current line
+;; https://github.com/syohex/emacs-git-messenger
+;; (use-package git-messenger
+;;   :ensure t
+;;   :bind
+;;   (("C-c g m" . git-messenger:popup-message)
+;;    :map git-messenger-map
+;;    ([(return)] . git-messenger:popup-close))
+;;   :config
+;;   ;; Enable magit-show-commit instead of pop-to-buffer
+;;   (setq git-messenger:show-detail t))
+
+;; (defun clang-format-defun ()
+;;   "Run clang-format on the current defun."
+;;   (interactive)
+;;   (save-excursion
+;;     (mark-defun)
+;;     (clang-format (region-beginning) (region-end))))
 
 
 
