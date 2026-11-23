@@ -11,6 +11,7 @@
 ;;; Code:
 
 (require 'magit)
+(require 'profiler)
 
 (defvar jl/magit-trace--log nil)
 (defvar jl/magit-trace--inside nil
@@ -28,29 +29,44 @@
                 jl/magit-trace--log)))
     (apply orig program rest)))
 
-(defun jl/magit-trace-refresh ()
-  "Refresh the current magit buffer and list its git processes by time."
-  (interactive)
+(defun jl/magit-trace-refresh (&optional profile)
+  "Refresh the current magit buffer and list its git processes by time.
+With prefix arg PROFILE, also run the CPU profiler during the refresh
+and show its report (expand the top entries with TAB)."
+  (interactive "P")
   (setq jl/magit-trace--log (list 'start))
   (advice-add 'process-file :around #'jl/magit-trace--around)
   (advice-add 'call-process :around #'jl/magit-trace--around)
-  (let ((t0 (float-time)) total)
+  (when profile
+    (when (profiler-running-p) (profiler-stop))
+    (profiler-start 'cpu))
+  (let ((t0 (float-time)) (gc0 gcs-done) (gce0 gc-elapsed)
+        (bufsize (buffer-size)) total)
     (unwind-protect (magit-refresh-buffer)
       (advice-remove 'process-file #'jl/magit-trace--around)
       (advice-remove 'call-process #'jl/magit-trace--around)
-      (setq total (* 1000 (- (float-time) t0))))
+      (setq total (* 1000 (- (float-time) t0)))
+      (when profile (profiler-stop)))
     (let* ((calls (sort (butlast jl/magit-trace--log)
                         (lambda (a b) (> (car a) (car b)))))
-           (git-ms (apply #'+ (mapcar #'car calls))))
+           (git-ms (apply #'+ (mapcar #'car calls)))
+           (gc-ms (* 1000 (- gc-elapsed gce0)))
+           (lines (count-lines (point-min) (point-max)))
+           (newsize (buffer-size)))
       (setq jl/magit-trace--log nil)
       (with-current-buffer (get-buffer-create "*jl-magit-trace*")
         (erase-buffer)
-        (insert (format "refresh %.0f ms, %d git processes %.0f ms, lisp %.0f ms\n\n"
+        (insert (format "refresh %.0f ms, %d git processes %.0f ms, lisp %.0f ms\n"
                         total (length calls) git-ms (- total git-ms)))
+        (insert (format "  of which GC %.0f ms (%d collections, gc-cons-threshold %s)\n"
+                        gc-ms (- gcs-done gc0) gc-cons-threshold))
+        (insert (format "  buffer: %d lines, %d chars (was %d)\n\n"
+                        lines newsize bufsize))
         (dolist (c calls)
           (insert (format "%7.0f ms  git %s\n" (car c) (cadr c))))
         (goto-char (point-min)))
-      (display-buffer "*jl-magit-trace*"))))
+      (display-buffer "*jl-magit-trace*")
+      (when profile (profiler-report)))))
 
 (provide 'jl-magit-trace)
 ;;; jl-magit-trace.el ends here
