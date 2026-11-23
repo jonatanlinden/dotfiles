@@ -1407,6 +1407,9 @@ otherwise insert the char literally (closing the unbalanced list)."
   (magit-refresh-status-buffer nil)         ; don't refresh status in the background
   (magit-commit-show-diff nil)              ; C-c C-d in the commit message shows it on demand
   (magit-revision-insert-related-refs nil)  ; skip "contained in" branch/tag lookup
+  ;; Needs githooks/ next to magit.el, which elpaca builds lack; magit then
+  ;; guesses a wrong dir and runs cygpath before every git call (~100 ms+).
+  (magit-run-hooks-from-githooks nil)
   :config
           (defun jl/magit-display-buffer (buffer)
             "Show Magit status in the same window when called from Dired."
@@ -1426,6 +1429,19 @@ otherwise insert the char literally (closing the unbalanced list)."
           (with-eval-after-load 'magit-refs
             (remove-hook 'magit-refs-sections-hook 'magit-insert-remote-branches)
             (remove-hook 'magit-refs-sections-hook 'magit-insert-tags))
+          ;; Don't look inside submodules for uncommitted edits (one git status
+          ;; per submodule, ~500 ms with 9); pointer changes are still shown.
+          (with-eval-after-load 'magit-status
+            (put 'magit-status-mode 'magit-diff-default-arguments
+                 '("--no-ext-diff" "--ignore-submodules=dirty"))
+            ;; ...and no "Filter!" header line for that default.
+            (defun jl/magit-hide-default-filter (orig)
+              "Call ORIG without the default --ignore-submodules=dirty."
+              (let ((magit-buffer-diff-args
+                     (remove "--ignore-submodules=dirty" magit-buffer-diff-args)))
+                (funcall orig)))
+            (advice-add 'magit-insert-diff-filter-header :around
+                        #'jl/magit-hide-default-filter))
   :bind (("C-x g" . magit-status)
          ("C-c g l" . magit-list-repositories)
          )
